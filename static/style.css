@@ -1,0 +1,75 @@
+:root {
+	--card-min-height: 420px;
+	--card-font-size: 1.18rem;
+	--container-max-width: 1200px;
+}
+
+body {
+	font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+	margin: 20px;
+	background: #f6f7fb;
+	color: #222;
+}
+
+.app-container {
+	max-width: var(--container-max-width);
+	margin-left: auto;
+	margin-right: auto;
+	padding-left: 18px;
+	padding-right: 18px;
+}
+
+.large-card .card-body {
+	min-height: var(--card-min-height);
+	font-size: var(--card-font-size);
+}
+
+.equal-height .card-body {
+	min-height: var(--card-min-height);
+}
+
+.result-box { background: #fff; padding: 0.75rem; border: 1px solid #eee; border-radius: 8px; }
+.result-box img { max-height: 200px; object-fit: contain; display: block; margin-left: auto; margin-right: auto; }
+.result-box .extracted { margin-top: 0.5rem; max-height: 140px; }
+.placeholder { color: #888; padding: 2rem; border: 1px dashed #ddd; border-radius: 6px; background: #fff; }
+.report-json { max-height: 70vh; overflow: auto; background: #0b1220; color: #d1f0ff; padding: 1rem; border-radius: 6px; }
+
+/* Larger inputs and buttons */
+.form-control, .btn { font-size: 1.02rem; }
+.btn-lg { padding: 0.9rem 1rem; font-size: 1.08rem; }
+
+/* Cards spacing */
+.card { border-radius: 8px; }
+.card-header { font-weight: 700; font-size: 2.12rem; }
+
+.navbar-brand { font-size: 1.6rem; font-weight: 800; }
+
+/* Operation buttons layout: fill available vertical space and be equal height */
+.operation-buttons { display: flex; flex-direction: column; gap: 1.6rem; height: 100%; }
+.operation-buttons a, .operation-buttons button { flex: 1 1 0; display:flex; align-items:center; justify-content:center; }
+.operation-buttons a.btn, .operation-buttons button.btn { width: 100%; font-size: 1.28rem; font-weight: 700; padding: 1rem 1.2rem; }
+
+/* Primary action styling for key buttons */
+.primary-action {
+	font-size: 1.18rem;
+	font-weight: 700;
+	padding: 0.8rem 1.2rem;
+	border-radius: 8px;
+}
+
+@media (max-width: 768px) {
+	.primary-action { font-size: 1.02rem; padding: 0.6rem 0.9rem; }
+}
+
+header h1 { margin: 0 0 8px 0; }
+.gallery { display: flex; flex-wrap: wrap; gap: 16px; }
+figure { width: 320px; border: 1px solid #ddd; padding: 8px; background: #fafafa; }
+figure img { max-width: 100%; height: auto; display: block; }
+pre { background: #222; color: #eee; padding: 12px; overflow: auto; }
+
+@media (max-width: 992px) {
+	:root { --card-min-height: 220px; }
+}
+
+/* Reduce vertical spacing between stacked cards in the right column */
+.app-container .col-md-8 .card.mb-3 { margin-bottom: 0.3rem; }

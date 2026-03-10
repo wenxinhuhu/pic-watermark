@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>合谋攻击与评分</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body class="bg-light">
+    <div class="container py-4">
+      <a href="/" class="btn btn-sm btn-outline-secondary mb-3">返回</a>
+      <h5>输出目录: {{ out_dir }}</h5>
+      <div class="row">
+        <div class="col-md-6 text-center mb-3">
+          {% if 'pirate_average.png' in images %}
+            <h6>Average</h6>
+            <img src="/results/pirate_average.png" class="img-fluid rounded mb-1">
+            {% if 'pirate_average_bits.png' in images %}
+              <img src="/results/pirate_average_bits.png" class="img-fluid rounded">
+            {% endif %}
+          {% else %}
+            <div class="placeholder">无平均合谋图像</div>
+          {% endif %}
+        </div>
+        <div class="col-md-6 text-center mb-3">
+          {% if 'pirate_xor.png' in images %}
+            <h6>XOR-like</h6>
+            <img src="/results/pirate_xor.png" class="img-fluid rounded mb-1">
+            {% if 'pirate_xor_bits.png' in images %}
+              <img src="/results/pirate_xor_bits.png" class="img-fluid rounded">
+            {% endif %}
+          {% else %}
+            <div class="placeholder">无异或合谋图像</div>
+          {% endif %}
+        </div>
+      </div>
+      <hr>
+      <div class="text-center">
+        {% if 'scores.png' in images %}
+          <img src="/results/scores.png" class="img-fluid rounded">
+        {% else %}
+          <div class="placeholder">无评分图像</div>
+        {% endif %}
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>用户水印结果</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body class="bg-light">
+    <div class="container py-4">
+      <a href="/" class="btn btn-sm btn-outline-secondary mb-3">返回</a>
+      <h5>输出目录: {{ out_dir }}</h5>
+      <div class="row">
+        {% for u in users %}
+          <div class="col-md-6 mb-3">
+            <div class="card">
+              <div class="card-header">{{ u.user_id }}</div>
+              <div class="card-body text-center">
+                {% set w = u.user_id + '_watermarked.png' %}
+                {% set e = u.user_id + '_extracted_bits.png' %}
+                {% if w in images %}
+                  <img src="/results/{{ w }}" class="img-fluid mb-2 rounded">
+                {% else %}
+                  <div class="placeholder">无水印图像</div>
+                {% endif %}
+                {% if e in images %}
+                  <img src="/results/{{ e }}" class="img-fluid extracted rounded">
+                {% else %}
+                  <div class="placeholder">无提取位图</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </body>
+</html>
