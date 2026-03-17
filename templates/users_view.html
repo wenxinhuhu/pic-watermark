@@ -183,6 +183,16 @@
                       {% endif %}
                     </div>
 
+                    {% set ur = report.user_results.get(u.user_id, {}) if report and report.user_results else {} %}
+                    {% if ur %}
+                      <div class="alert alert-light border mt-3 mb-0">
+                        <div><strong>嵌入字符串：</strong>{{ ur.embedded_text }}</div>
+                        <div><strong>提取字符串：</strong>{{ ur.extracted_text if ur.extracted_text else '解析失败' }}</div>
+                        <div><strong>字符串校验：</strong>{{ '通过' if ur.text_ok else '失败' }}</div>
+                        <div><strong>指纹 BER：</strong>{{ '%.4f'|format(ur.fingerprint_ber) }}</div>
+                      </div>
+                    {% endif %}
+
                     <div class="enhance-box mb-3">
                       <div class="d-flex align-items-center gap-2">
                         <span class="range-label">增强倍数</span>

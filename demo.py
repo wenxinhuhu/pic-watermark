@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+import zlib
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,6 +18,55 @@ from psb_bridge import (
     save_bgr_as_flattened_psb_via_photoshop,
     save_bgr_native_tiff,
 )
+
+DISPLAY_TEXT_BYTES = 40  #可读字符串最多 40 字节，够放 UID/CID
+
+def bytes_to_bits(data: bytes) -> np.ndarray:
+    return np.unpackbits(np.frombuffer(data, dtype=np.uint8)).astype(np.uint8)
+
+def bits_to_bytes(bits: np.ndarray) -> bytes:
+    bits = np.asarray(bits, dtype=np.uint8).flatten()
+    pad = (-len(bits)) % 8
+    if pad:
+        bits = np.pad(bits, (0, pad), constant_values=0)
+    return np.packbits(bits).tobytes()
+
+def build_display_text(user_id: str, content_id: str) -> str:
+    return f"UID={user_id};CID={content_id}"
+
+def encode_display_text(text: str, max_text_bytes: int = DISPLAY_TEXT_BYTES) -> np.ndarray:
+    raw = text.encode("utf-8")
+    if len(raw) > max_text_bytes:
+        raise ValueError(f"展示字符串过长，最多 {max_text_bytes} 字节，当前 {len(raw)}")
+    body = raw.ljust(max_text_bytes, b"\0")
+    crc = zlib.crc32(raw).to_bytes(4, "big")
+    packet = len(raw).to_bytes(2, "big") + body + crc
+    return bytes_to_bits(packet)
+
+def decode_display_text(bits: np.ndarray, max_text_bytes: int = DISPLAY_TEXT_BYTES) -> tuple[str, bool]:
+    data = bits_to_bytes(bits)
+    packet_len = 2 + max_text_bytes + 4
+    if len(data) < packet_len:
+        return "", False
+
+    data = data[:packet_len]
+    n = int.from_bytes(data[:2], "big")
+    if n > max_text_bytes:
+        return "", False
+
+    raw = data[2:2+n]
+    crc_saved = data[2 + max_text_bytes: 2 + max_text_bytes + 4]
+    crc_now = zlib.crc32(raw).to_bytes(4, "big")
+    ok = (crc_saved == crc_now)
+
+    try:
+        text = raw.decode("utf-8")
+    except Exception:
+        return "", False
+
+    return text, ok
+
+DISPLAY_BITS_LEN = (2 + DISPLAY_TEXT_BYTES + 4) * 8
 
 USER_DB = [
     UserRecord(user_id="user_1",  user_key="k_9f2A1x7P"),
@@ -254,12 +304,27 @@ def run_demo(args) -> dict:
     clean_extract_ber = {}
     psnr_map = {}
     user_outputs = {}
+    user_results = {}
+
     for idx, user in enumerate(users):
-        img = wm.embed(cover, codebook[idx], content_id=args.content_id).image
+        display_text = build_display_text(user.user_id, args.content_id)
+        display_bits = encode_display_text(display_text)
+        fingerprint_bits = codebook[idx]
+
+        payload_bits = np.concatenate([display_bits, fingerprint_bits]).astype(np.uint8)
+
+        img = wm.embed(cover, payload_bits, content_id=args.content_id).image
         watermarked[user.user_id] = img
 
-        extracted = wm.extract(img, n_bits=args.code_length, content_id=args.content_id)
-        clean_extract_ber[user.user_id] = wm.bit_error_rate(codebook[idx], extracted)
+        extracted = wm.extract(img, n_bits=len(payload_bits), content_id=args.content_id)
+
+        extracted_display_bits = extracted[:DISPLAY_BITS_LEN]
+        extracted_fingerprint_bits = extracted[DISPLAY_BITS_LEN:]
+
+        extracted_text, text_ok = decode_display_text(extracted_display_bits)
+        clean_extract_ber[user.user_id] = wm.bit_error_rate(
+            fingerprint_bits, extracted_fingerprint_bits
+        )
 
         peak = dtype_peak(cover.dtype)
         mse = float(np.mean((cover.astype(np.float32) - img.astype(np.float32)) ** 2))
@@ -267,42 +332,61 @@ def run_demo(args) -> dict:
             10.0 * np.log10((peak ** 2) / mse)
         )
 
-        #save_rgb(out / f"{user.user_id}_watermarked.png", img)
-        #ave_rgb(out / f"{user.user_id}_extracted_bits.png", wm.bits_to_noise_image(extracted))
         user_paths = save_main_asset(
             out, f"{user.user_id}_watermarked", img, source_meta, emit_psb=args.emit_psb
         )
         user_outputs[user.user_id] = user_paths
-        save_rgb(out / f"{user.user_id}_extracted_bits.png", wm.bits_to_noise_image(extracted))
-        
+
+        user_results[user.user_id] = {
+            "embedded_text": display_text,
+            "extracted_text": extracted_text,
+            "text_ok": text_ok,
+            "fingerprint_ber": clean_extract_ber[user.user_id],
+        }
+
+        # 这里只保存“指纹部分”的噪声图，不保存整段 payload
+        save_rgb(
+            out / f"{user.user_id}_extracted_bits.png",
+            wm.bits_to_noise_image(extracted_fingerprint_bits)
+        )
+
+
     colluder_imgs = [watermarked[cid] for cid in colluder_ids]
 
     pirate_avg = average_collusion(colluder_imgs)
-    avg_bits = wm.extract(pirate_avg, n_bits=args.code_length, content_id=args.content_id)
-    avg_scores = accuse_symmetric(avg_bits, codebook, p)
+    total_bits = DISPLAY_BITS_LEN + args.code_length
+
+    avg_bits = wm.extract(pirate_avg, n_bits=total_bits, content_id=args.content_id)
+    avg_text, avg_text_ok = decode_display_text(avg_bits[:DISPLAY_BITS_LEN])
+    avg_fp_bits = avg_bits[DISPLAY_BITS_LEN:]
+    avg_scores = accuse_symmetric(avg_fp_bits, codebook, p)
     avg_ranking = rank_suspects(users, avg_scores)
-    #save_rgb(out / "pirate_average.png", pirate_avg)
-    #save_rgb(out / "pirate_average_bits.png", wm.bits_to_noise_image(avg_bits))
+
     pirate_avg_paths = save_main_asset(
         out, "pirate_average", pirate_avg, source_meta, emit_psb=args.emit_psb
     )
-    save_rgb(out / "pirate_average_bits.png", wm.bits_to_noise_image(avg_bits))
+    save_rgb(out / "pirate_average_bits.png", wm.bits_to_noise_image(avg_fp_bits))
+
     pirate_xor, xor_bits_fused = xor_collusion_via_reembed(
         base_image=pirate_avg,
         colluder_images=colluder_imgs,
         wm=wm,
-        n_bits=args.code_length,
+        n_bits=total_bits,
         content_id=args.content_id,
     )
-    xor_bits = wm.extract(pirate_xor, n_bits=args.code_length, content_id=args.content_id)
-    xor_scores = accuse_symmetric(xor_bits, codebook, p)
+
+    xor_bits = wm.extract(pirate_xor, n_bits=total_bits, content_id=args.content_id)
+    xor_text, xor_text_ok = decode_display_text(xor_bits[:DISPLAY_BITS_LEN])
+    xor_fp_bits = xor_bits[DISPLAY_BITS_LEN:]
+    xor_scores = accuse_symmetric(xor_fp_bits, codebook, p)
     xor_ranking = rank_suspects(users, xor_scores)
-    #save_rgb(out / "pirate_xor.png", pirate_xor)
-    #save_rgb(out / "pirate_xor_bits.png", wm.bits_to_noise_image(xor_bits))
+
     pirate_xor_paths = save_main_asset(
         out, "pirate_xor", pirate_xor, source_meta, emit_psb=args.emit_psb
     )
-    save_rgb(out / "pirate_xor_bits.png", wm.bits_to_noise_image(xor_bits))
+    save_rgb(out / "pirate_xor_bits.png", wm.bits_to_noise_image(xor_fp_bits))
+
+
     plot_scores(
         out / "scores.png",
         {
@@ -320,6 +404,8 @@ def run_demo(args) -> dict:
             "image": args.image if args.image is not None else "synthetic",
             "num_users": args.num_users,
             "code_length": args.code_length,
+            "display_bits_len": DISPLAY_BITS_LEN,
+            "total_bits": DISPLAY_BITS_LEN + args.code_length,
             "colluders": colluder_ids,
             "delta": args.delta,
             "repeats": args.repeats,
@@ -334,11 +420,16 @@ def run_demo(args) -> dict:
         },
         "clean_ber": clean_extract_ber,
         "psnr": psnr_map,
+        "user_results": user_results,
         "average_attack": {
+            "decoded_text": avg_text,
+            "decoded_text_ok": avg_text_ok,
             "top5": avg_ranking[:5],
             "top3_hit_count": sum(uid in colluder_ids for uid, _ in avg_ranking[:3]),
         },
         "xor_attack": {
+            "decoded_text": xor_text,
+            "decoded_text_ok": xor_text_ok,
             "top5": xor_ranking[:5],
             "top3_hit_count": sum(uid in colluder_ids for uid, _ in xor_ranking[:3]),
         },

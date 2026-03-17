@@ -207,20 +207,26 @@ def view_users():
     out_path = resolve_out_dir(request.args.get("out_dir"), default=RESULTS_DIR)
     files = sorted([p.name for p in out_path.iterdir() if p.is_file()]) if out_path.exists() else []
     users = load_users()
+    report = load_report(out_path)
     return render_template(
         "users_view.html",
         users=users,
         images=files,
         out_dir=str(out_path.relative_to(BASE_DIR)),
+        report=report,
     )
 
 @app.route("/view/collusion")
 def view_collusion():
     out_path = resolve_out_dir(request.args.get("out_dir"), default=RESULTS_DIR)
-    #images = sorted([p.name for p in out_path.glob("*.png")]) if out_path.exists() else []
     files = sorted([p.name for p in out_path.iterdir() if p.is_file()]) if out_path.exists() else []
-    return render_template("collusion_view.html", images=files, out_dir=str(out_path.relative_to(BASE_DIR)))
-
+    report = load_report(out_path)
+    return render_template(
+        "collusion_view.html",
+        images=files,
+        out_dir=str(out_path.relative_to(BASE_DIR)),
+        report=report,
+    )
 
 @app.route("/results/<path:filename>")
 def results_file(filename: str):
@@ -251,5 +257,14 @@ def view_report():
         out_dir=str(out_path.relative_to(BASE_DIR)),
     )
 
+def load_report(out_path: Path) -> dict | None:
+    report_path = out_path / "report.json"
+    if not report_path.exists():
+        return None
+    try:
+        return json.loads(report_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")

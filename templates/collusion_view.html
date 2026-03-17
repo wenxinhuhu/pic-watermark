@@ -157,6 +157,13 @@
                     </button>
                   </div>
 
+                  {% if report and report.average_attack %}
+                    <div class="alert alert-light border mt-3 mb-0">
+                      <div><strong>提取字符串：</strong>{{ report.average_attack.decoded_text if report.average_attack.decoded_text else '解析失败' }}</div>
+                      <div><strong>字符串校验：</strong>{{ '通过' if report.average_attack.decoded_text_ok else '失败' }}</div>
+                    </div>
+                  {% endif %}
+
                   <div class="enhance-box mb-2">
                     <div class="d-flex align-items-center gap-2">
                       <span class="range-label">增强倍数</span>
@@ -251,6 +258,13 @@
                       增强差异图
                     </button>
                   </div>
+
+                  {% if report and report.xor_attack %}
+                    <div class="alert alert-light border mt-3 mb-0">
+                      <div><strong>提取字符串：</strong>{{ report.xor_attack.decoded_text if report.xor_attack.decoded_text else '解析失败' }}</div>
+                      <div><strong>字符串校验：</strong>{{ '通过' if report.xor_attack.decoded_text_ok else '失败' }}</div>
+                    </div>
+                  {% endif %}
 
                   <div class="enhance-box mb-2">
                     <div class="d-flex align-items-center gap-2">
