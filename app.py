@@ -18,7 +18,8 @@ from flask import (
 
 import demo as demo_mod
 from tardos import UserRecord
-
+import uuid
+from werkzeug.utils import secure_filename
 
 BASE_DIR = Path(__file__).parent
 RESULTS_DIR = BASE_DIR / "results"
@@ -72,7 +73,7 @@ def index() -> str:
     out_path = resolve_out_dir(out_dir_param, default=RESULTS_DIR)
 
     images = sorted([p.name for p in out_path.glob("*.png")]) if out_path.exists() else []
-    
+
     report = None
     report_path = out_path / "report.json"
     if report_path.exists():
@@ -81,14 +82,90 @@ def index() -> str:
         except Exception:
             report = {"error": "无法解析 report.json"}
 
+    extract_result = None
+    if request.args.get("extract_text") is not None:
+        extract_result = {
+            "image_path": request.args.get("extract_image_path", ""),
+            "input_is_psb": request.args.get("extract_input_is_psb", ""),
+            "input_depth": request.args.get("extract_input_depth", ""),
+            "display_bits_len": request.args.get("extract_display_bits_len", ""),
+            "extracted_text": request.args.get("extract_text", ""),
+            "text_ok": request.args.get("extract_ok", "false") == "true",
+        }
+
     return render_template(
         "index.html",
         users=users,
         images=images,
         report=report,
         current_out_dir=str(out_path.relative_to(BASE_DIR)),
+        extract_result=extract_result,
     )
 
+@app.route("/extract_text", methods=["POST"])
+def extract_text():
+    out_dir_form = request.form.get("out_dir", "results").strip() or "results"
+
+    master_key = request.form.get("extract_master_key", "server-master-key-2026").strip()
+    content_id = request.form.get("extract_content_id", "asset-demo-001").strip()
+    delta = float(request.form.get("extract_delta", 8.0))
+    repeats = int(request.form.get("extract_repeats", 2))
+    code_length = int(request.form.get("extract_code_length", 512))
+    delta_mode = request.form.get("extract_delta_mode", "normalized_8bit")
+    psb_max_side = int(request.form.get("extract_psb_max_side", 0))
+
+    image_path_text = request.form.get("extract_image_path", "").strip()
+    image_file = request.files.get("extract_image_file")
+
+    try:
+        image_path = None
+
+        if image_file and image_file.filename:
+            upload_dir = DATA_DIR / "extract_uploads"
+            upload_dir.mkdir(parents=True, exist_ok=True)
+
+            safe_name = secure_filename(image_file.filename) or "upload.png"
+            suffix = Path(safe_name).suffix or ".png"
+            saved_path = upload_dir / f"extract_{uuid.uuid4().hex}{suffix}"
+            image_file.save(str(saved_path))
+            image_path = str(saved_path)
+
+        elif image_path_text:
+            image_path = image_path_text
+
+        else:
+            flash("请上传一张带水印图片，或填写图片路径", "danger")
+            return redirect(url_for("index", out_dir=out_dir_form))
+
+        result = extract_display_text_from_image(
+            image_path=image_path,
+            master_key=master_key,
+            content_id=content_id,
+            delta=delta,
+            repeats=repeats,
+            code_length=code_length,
+            delta_mode=delta_mode,
+            psb_max_side=psb_max_side,
+        )
+
+        flash("字符串提取完成", "success")
+        return redirect(
+            url_for(
+                "index",
+                out_dir=out_dir_form,
+                extract_text=result["extracted_text"],
+                extract_ok=str(result["text_ok"]).lower(),
+                extract_image_path=result["image_path"],
+                extract_input_is_psb=str(result["input_is_psb"]).lower(),
+                extract_input_depth=result["input_depth"],
+                extract_display_bits_len=result["display_bits_len"],
+            )
+        )
+
+    except Exception as exc:
+        flash(f"字符串提取失败: {exc}", "danger")
+        return redirect(url_for("index", out_dir=out_dir_form))
+    
 
 @app.route("/users/add", methods=["POST"])
 def add_user():
@@ -266,5 +343,50 @@ def load_report(out_path: Path) -> dict | None:
     except Exception:
         return None
     
+def extract_display_text_from_image(
+    image_path: str,
+    master_key: str,
+    content_id: str,
+    delta: float,
+    repeats: int,
+    delta_mode: str,
+    code_length: int,
+    psb_max_side: int = 0,
+) -> dict:
+    image_bgr, source_meta = demo_mod.load_cover_and_meta(
+        image_path=image_path,
+        cover_size=512,
+        psb_max_side=psb_max_side,
+    )
+
+    wm = demo_mod.BlindDwtDctQim(
+        master_key=master_key,
+        delta=delta,
+        repeats=repeats,
+        coeff_pos=(3, 3),
+        bands=("LH", "HL"),
+        delta_mode=delta_mode,
+    )
+
+    total_bits = demo_mod.DISPLAY_BITS_LEN + int(code_length)
+
+    all_bits = wm.extract(
+        image_bgr,
+        n_bits=total_bits,
+        content_id=content_id,
+    )
+
+    display_bits = all_bits[:demo_mod.DISPLAY_BITS_LEN]
+    extracted_text, text_ok = demo_mod.decode_display_text(display_bits)
+
+    return {
+        "image_path": image_path,
+        "input_is_psb": source_meta.input_is_psb,
+        "input_depth": source_meta.depth,
+        "display_bits_len": int(demo_mod.DISPLAY_BITS_LEN),
+        "extracted_text": extracted_text,
+        "text_ok": bool(text_ok),
+    }
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")

@@ -158,6 +158,79 @@
             </div>
           </div>
 
+          <div class="card mb-3 large-card">
+            <div class="card-header">提取字符串</div>
+            <div class="card-body">
+              <form method="post" action="/extract_text" enctype="multipart/form-data">
+                <input type="hidden" name="out_dir" value="{{ current_out_dir or 'results' }}">
+
+                <div class="mb-2">
+                  <label class="form-label">上传带水印图片</label>
+                  <input type="file" name="extract_image_file" class="form-control form-control-sm">
+                </div>
+
+                <div class="mb-2">
+                  <label class="form-label">或直接填写图片路径</label>
+                  <input name="extract_image_path" class="form-control form-control-sm" placeholder="path/to/watermarked_image.png">
+                </div>
+
+                <div class="row g-2 mb-2">
+                  <div class="col-6">
+                    <label class="form-label">master_key</label>
+                    <input name="extract_master_key" value="server-master-key-2026" class="form-control form-control-sm">
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label">content_id</label>
+                    <input name="extract_content_id" value="asset-demo-001" class="form-control form-control-sm">
+                  </div>
+                </div>
+
+                <div class="row g-2 mb-2">
+                  <div class="col-3">
+                    <label class="form-label">delta</label>
+                    <input name="extract_delta" type="number" step="0.1" value="8.0" class="form-control form-control-sm">
+                  </div>
+                  <div class="col-3">
+                    <label class="form-label">repeats</label>
+                    <input name="extract_repeats" type="number" value="2" class="form-control form-control-sm">
+                  </div>
+                  <div class="col-3">
+                    <label class="form-label">code_length</label>
+                    <input name="extract_code_length" type="number" value="512" class="form-control form-control-sm">
+                  </div>
+                  <div class="col-3">
+                    <label class="form-label">psb_max_side</label>
+                    <input name="extract_psb_max_side" type="number" value="0" class="form-control form-control-sm">
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label">delta_mode</label>
+                  <select name="extract_delta_mode" class="form-select form-select-sm">
+                    <option value="normalized_8bit" selected>normalized_8bit（推荐）</option>
+                    <option value="native">native</option>
+                  </select>
+                </div>
+
+                <div class="text-end">
+                  <button class="btn btn-warning text-dark">提取并显示字符串</button>
+                </div>
+              </form>
+
+              {% if extract_result %}
+                <hr>
+                <div class="alert alert-light border mb-0">
+                  <div><strong>图片：</strong>{{ extract_result.image_path }}</div>
+                  <div><strong>提取字符串：</strong>{{ extract_result.extracted_text if extract_result.extracted_text else '解析失败' }}</div>
+                  <div><strong>字符串校验：</strong>{{ '通过' if extract_result.text_ok else '失败' }}</div>
+                  <div><strong>输入是否 PSB：</strong>{{ extract_result.input_is_psb }}</div>
+                  <div><strong>输入位深：</strong>{{ extract_result.input_depth }}</div>
+                  <div><strong>提取位数：</strong>{{ extract_result.display_bits_len }}</div>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
           <div class="card mb-3 large-card equal-height">
             <div class="card-header">输出摘要</div>
             <div class="card-body">
