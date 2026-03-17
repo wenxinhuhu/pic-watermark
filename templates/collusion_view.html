@@ -104,7 +104,7 @@
   </head>
   <body>
     <div class="container py-4">
-      <a href="/" class="btn btn-sm btn-outline-secondary mb-3">返回</a>
+      <a href="{{ url_for('index', out_dir=out_dir) }}" class="btn btn-sm btn-outline-secondary mb-3">返回</a>
 
       <h5 class="mb-3">输出目录: {{ out_dir }}</h5>
 
@@ -183,6 +183,14 @@
                   download>
                   下载 PNG
                 </a>
+
+                {% if 'pirate_average.tif' in images %}
+                  <a class="btn btn-sm btn-outline-success"
+                    href="{{ url_for('results_file', filename='pirate_average.tif', out_dir=out_dir) }}"
+                    download>
+                    下载 TIFF
+                  </a>
+                {% endif %}
 
                 {% if 'pirate_average.psb' in images %}
                   <a class="btn btn-sm btn-outline-primary"
@@ -270,6 +278,14 @@
                   download>
                   下载 PNG
                 </a>
+
+                {% if 'pirate_xor.tif' in images %}
+                  <a class="btn btn-sm btn-outline-success"
+                    href="{{ url_for('results_file', filename='pirate_xor.tif', out_dir=out_dir) }}"
+                    download>
+                    下载 TIFF
+                  </a>
+                {% endif %}
 
                 {% if 'pirate_xor.psb' in images %}
                   <a class="btn btn-sm btn-outline-primary"

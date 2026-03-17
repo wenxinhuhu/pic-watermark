@@ -10,7 +10,13 @@ import numpy as np
 
 from tardos import UserRecord, accuse_symmetric, build_codebook, rank_suspects, sample_tardos_probabilities
 from watermark import BlindDwtDctQim, average_collusion, xor_collusion_via_reembed
-from psb_bridge import SourceMeta,read_cover_asset,save_bgr_preview_png,save_bgr_as_flattened_psb_via_photoshop
+from psb_bridge import (
+    SourceMeta,
+    read_cover_asset,
+    save_bgr_preview_png,
+    save_bgr_as_flattened_psb_via_photoshop,
+    save_bgr_native_tiff,
+)
 
 USER_DB = [
     UserRecord(user_id="user_1",  user_key="k_9f2A1x7P"),
@@ -40,9 +46,27 @@ def make_synthetic_cover(size: int = 512) -> np.ndarray:
                 cv2.FONT_HERSHEY_SIMPLEX, 1.8, (245, 245, 245), 3, cv2.LINE_AA)
     return img
 
+def dtype_peak(dtype: np.dtype) -> float:
+    dtype = np.dtype(dtype)
+    if dtype == np.uint8:
+        return 255.0
+    if dtype == np.uint16:
+        return 65535.0
+    raise ValueError(f"不支持的 dtype: {dtype}")
+
+
+def to_preview_u8(image: np.ndarray) -> np.ndarray:
+    if image.dtype == np.uint8:
+        return image
+
+    if image.dtype == np.uint16:
+        preview = np.rint(image.astype(np.float32) / 65535.0 * 255.0)
+        return np.clip(preview, 0, 255).astype(np.uint8)
+
+    raise ValueError(f"不支持预览转换的 dtype: {image.dtype}")
 
 def save_rgb(path: Path, bgr: np.ndarray) -> None:
-    cv2.imwrite(str(path), bgr)
+    cv2.imwrite(str(path), to_preview_u8(bgr))
 
 
 def plot_scores(path: Path, score_dict: dict[str, list[tuple[str, float]]], colluders: set[str]) -> None:
@@ -79,11 +103,14 @@ def parse_args():
     parser.add_argument("--colluders", type=str, default="user_2,user_5,user_7",
                         help="合谋用户，逗号分隔，例如 user_2,user_5,user_7")
 
-    parser.add_argument("--delta", type=float, default=26.0,
+    parser.add_argument("--delta", type=float, default=8.0,
                         help="QIM量化步长")
-    parser.add_argument("--repeats", type=int, default=6,
+    parser.add_argument("--repeats", type=int, default=2,
                         help="每个bit重复嵌入次数")
-
+    parser.add_argument("--delta-mode", type=str, default="normalized_8bit",
+                    choices=["normalized_8bit", "native"],
+                    help="delta 的解释方式")
+    
     parser.add_argument("--master-key", type=str, default="server-master-key-2026",
                         help="系统主密钥")
     parser.add_argument("--content-id", type=str, default="asset-demo-001",
@@ -96,8 +123,8 @@ def parse_args():
     parser.add_argument("--emit-psb", action="store_true",
                         help="如果输入是 PSD/PSB，则额外输出扁平单层 PSB 分发文件")
 
-    parser.add_argument("--psb-max-side", type=int, default=4096,
-                        help="读取 PSD/PSB 时可选缩边；0 表示不缩放。首测建议 4096")
+    parser.add_argument("--psb-max-side", type=int, default=0,
+                        help="读取 PSD/PSB 时可选缩边；0 表示不缩放，直接使用原始尺寸（可能导致内存占用过大）")
     return parser.parse_args()
 
 
@@ -138,18 +165,25 @@ def save_main_asset(
 ) -> dict:
     result = {
         "png": None,
+        "tif": None,
         "psb": None,
         "psb_error": None,
     }
+    # 1) 正式保真输出：TIFF
+    tif_path = out_dir / f"{stem}.tif"
+    save_bgr_native_tiff(tif_path, bgr, source_meta)
+    result["tif"] = str(tif_path)
 
+    # 2) 网页/演示预览：PNG
     png_path = out_dir / f"{stem}.png"
     save_bgr_preview_png(png_path, bgr)
     result["png"] = str(png_path)
 
-    if emit_psb and source_meta.input_is_psb:
+    # 3) PSB 分发输出
+    if emit_psb:
         psb_path = out_dir / f"{stem}.psb"
         try:
-            save_bgr_as_flattened_psb_via_photoshop(psb_path, bgr)
+            save_bgr_as_flattened_psb_via_photoshop(psb_path, bgr, dpi_x=source_meta.dpi_x, dpi_y=source_meta.dpi_y, icc_profile=source_meta.icc_profile)
             result["psb"] = str(psb_path)
         except Exception as exc:
             result["psb_error"] = str(exc)
@@ -187,6 +221,13 @@ def run_demo(args) -> dict:
         args.cover_size,
         args.psb_max_side,
     )
+    if source_meta.input_is_psb and source_meta.depth == 16 and cover.dtype != np.uint16:
+        raise RuntimeError(
+            f"检测到输入是 16-bit PSB，但当前读入数组 dtype={cover.dtype}。"
+            "这说明输入桥没有保住 16-bit，当前结果不能视为保真输出。"
+        )
+    if source_meta.input_is_psb and args.psb_max_side != 0:
+        raise RuntimeError("保真模式下，PSB 输入时 psb_max_side 必须为 0；否则会发生缩图。")
     cover_paths = save_main_asset(out, "cover", cover, source_meta, emit_psb=args.emit_psb)
 
     users = build_users(args.num_users)
@@ -205,7 +246,8 @@ def run_demo(args) -> dict:
         delta=args.delta,
         repeats=args.repeats,
         coeff_pos=(3, 3),
-        bands=("LL", "LH"),
+        bands=("LH", "HL"),#LL感觉变动容易引起色差
+        delta_mode=args.delta_mode,
     )
 
     watermarked = {}
@@ -219,9 +261,10 @@ def run_demo(args) -> dict:
         extracted = wm.extract(img, n_bits=args.code_length, content_id=args.content_id)
         clean_extract_ber[user.user_id] = wm.bit_error_rate(codebook[idx], extracted)
 
+        peak = dtype_peak(cover.dtype)
         mse = float(np.mean((cover.astype(np.float32) - img.astype(np.float32)) ** 2))
         psnr_map[user.user_id] = 99.0 if mse <= 1e-12 else float(
-            10.0 * np.log10((255.0 ** 2) / mse)
+            10.0 * np.log10((peak ** 2) / mse)
         )
 
         #save_rgb(out / f"{user.user_id}_watermarked.png", img)
@@ -287,6 +330,7 @@ def run_demo(args) -> dict:
             "psb_max_side": args.psb_max_side,
             "input_is_psb": source_meta.input_is_psb,
             "input_depth": source_meta.depth,
+            "delta_mode": args.delta_mode,
         },
         "clean_ber": clean_extract_ber,
         "psnr": psnr_map,

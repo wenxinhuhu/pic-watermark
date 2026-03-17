@@ -125,8 +125,9 @@ def run():
     num_users = int(request.form.get("num_users", 8))
     code_length = int(request.form.get("code_length", 320))
     colluders = request.form.get("colluders", "").strip()
-    delta = float(request.form.get("delta", 26.0))
-    repeats = int(request.form.get("repeats", 6))
+    delta = float(request.form.get("delta", 8.0))
+    repeats = int(request.form.get("repeats", 2))
+    delta_mode = request.form.get("delta_mode", "normalized_8bit")
     master_key = request.form.get("master_key", "server-master-key-2026")
     content_id = request.form.get("content_id", "asset-demo-001")
     seed = int(request.form.get("seed", 2026))
@@ -134,7 +135,7 @@ def run():
 
     # 新增：PSB 相关参数
     emit_psb = request.form.get("emit_psb") == "on"
-    psb_max_side = int(request.form.get("psb_max_side", 4096))
+    psb_max_side = int(request.form.get("psb_max_side", 0))
 
     users = load_users()
     if num_users < 1 or num_users > len(users):
@@ -167,6 +168,7 @@ def run():
         cover_size=cover_size,
         emit_psb=emit_psb,
         psb_max_side=psb_max_side,
+        delta_mode=delta_mode,
     )
 
     try:

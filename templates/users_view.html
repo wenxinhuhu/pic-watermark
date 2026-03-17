@@ -101,7 +101,7 @@
   </head>
   <body>
     <div class="container py-4">
-      <a href="/" class="btn btn-sm btn-outline-secondary mb-3">返回</a>
+      <a href="{{ url_for('index', out_dir=out_dir) }}" class="btn btn-sm btn-outline-secondary mb-3">返回</a>
 
       <h5 class="mb-3">输出目录: {{ out_dir }}</h5>
 
@@ -152,13 +152,14 @@
                         带水印图
                       </button>
                       <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="raw-diff">
-                        原始差异图
+                        预览差异图
                       </button>
                       <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="enhanced-diff">
-                        增强差异图
+                        增强预览差异图
                       </button>
                     </div>
 
+                    {% set w_tif = u.user_id + '_watermarked.tif' %}
                     {% set w_psb = u.user_id + '_watermarked.psb' %}
                     <div class="d-flex gap-2 flex-wrap">
                       <a class="btn btn-sm btn-outline-secondary"
@@ -166,7 +167,13 @@
                         download>
                         下载 PNG
                       </a>
-
+                      {% if w_tif in images %}
+                        <a class="btn btn-sm btn-outline-success"
+                          href="{{ url_for('results_file', filename=w_tif, out_dir=out_dir) }}"
+                          download>
+                          下载 TIFF
+                        </a>
+                      {% endif %}
                       {% if w_psb in images %}
                         <a class="btn btn-sm btn-outline-primary"
                           href="{{ url_for('results_file', filename=w_psb, out_dir=out_dir) }}"
