@@ -121,13 +121,13 @@
                 <div class="attack-viewer">
                   <div class="viewer-stage mb-3">
                     <img
-                      src="/results/cover.png"
+                      src="{{ url_for('results_file', filename='cover.png', out_dir=out_dir) }}"
                       alt="原图"
                       class="stage-layer cover-layer active"
                       data-mode="cover"
                     >
                     <img
-                      src="/results/pirate_average.png"
+                      src="{{ url_for('results_file', filename='pirate_average.png', out_dir=out_dir) }}"
                       alt="Average 合谋图"
                       class="stage-layer attacked-layer"
                       data-mode="attacked"
@@ -177,7 +177,22 @@
                   缺少 cover.png 或 pirate_average.png
                 </div>
               {% endif %}
-            </div>
+              <div class="d-flex gap-2 flex-wrap mt-3">
+                <a class="btn btn-sm btn-outline-secondary"
+                  href="{{ url_for('results_file', filename='pirate_average.png', out_dir=out_dir) }}"
+                  download>
+                  下载 PNG
+                </a>
+
+                {% if 'pirate_average.psb' in images %}
+                  <a class="btn btn-sm btn-outline-primary"
+                    href="{{ url_for('results_file', filename='pirate_average.psb', out_dir=out_dir) }}"
+                    download>
+                    下载 PSB
+                  </a>
+                {% endif %}
+              </div>
+            </div>  
           </div>
         </div>
 
@@ -193,13 +208,13 @@
                 <div class="attack-viewer">
                   <div class="viewer-stage mb-3">
                     <img
-                      src="/results/cover.png"
+                      src="{{ url_for('results_file', filename='cover.png', out_dir=out_dir) }}"
                       alt="原图"
                       class="stage-layer cover-layer active"
                       data-mode="cover"
                     >
                     <img
-                      src="/results/pirate_xor.png"
+                      src="{{ url_for('results_file', filename='pirate_xor.png', out_dir=out_dir) }}"
                       alt="XOR-like 合谋图"
                       class="stage-layer attacked-layer"
                       data-mode="attacked"
@@ -249,6 +264,21 @@
                   缺少 cover.png 或 pirate_xor.png
                 </div>
               {% endif %}
+              <div class="d-flex gap-2 flex-wrap mt-3">
+                <a class="btn btn-sm btn-outline-secondary"
+                  href="{{ url_for('results_file', filename='pirate_xor.png', out_dir=out_dir) }}"
+                  download>
+                  下载 PNG
+                </a>
+
+                {% if 'pirate_xor.psb' in images %}
+                  <a class="btn btn-sm btn-outline-primary"
+                    href="{{ url_for('results_file', filename='pirate_xor.psb', out_dir=out_dir) }}"
+                    download>
+                    下载 PSB
+                  </a>
+                {% endif %}
+              </div>
             </div>
           </div>
         </div>
@@ -261,7 +291,11 @@
         </div>
         <div class="card-body">
           {% if 'scores.png' in images %}
-            <img src="/results/scores.png" alt="评分图" class="score-image">
+            <img
+              src="{{ url_for('results_file', filename='scores.png', out_dir=out_dir) }}"
+              alt="评分图"
+              class="score-image"
+            >
           {% else %}
             <div class="placeholder-box">
               无评分图像

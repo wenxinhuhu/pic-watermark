@@ -10,6 +10,7 @@ import numpy as np
 
 from tardos import UserRecord, accuse_symmetric, build_codebook, rank_suspects, sample_tardos_probabilities
 from watermark import BlindDwtDctQim, average_collusion, xor_collusion_via_reembed
+from psb_bridge import SourceMeta,read_cover_asset,save_bgr_preview_png,save_bgr_as_flattened_psb_via_photoshop
 
 USER_DB = [
     UserRecord(user_id="user_1",  user_key="k_9f2A1x7P"),
@@ -92,19 +93,68 @@ def parse_args():
 
     parser.add_argument("--cover-size", type=int, default=512,
                         help="未提供图片时，自动生成合成图的尺寸")
+    parser.add_argument("--emit-psb", action="store_true",
+                        help="如果输入是 PSD/PSB，则额外输出扁平单层 PSB 分发文件")
 
+    parser.add_argument("--psb-max-side", type=int, default=4096,
+                        help="读取 PSD/PSB 时可选缩边；0 表示不缩放。首测建议 4096")
     return parser.parse_args()
 
 
-def load_cover_image(image_path: str | None, cover_size: int) -> np.ndarray:
+# def load_cover_image(image_path: str | None, cover_size: int) -> np.ndarray:
+#     if image_path is None:
+#         return make_synthetic_cover(cover_size)
+
+#     img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+#     if img is None:
+#         raise FileNotFoundError(f"无法读取图片: {image_path}")
+#     return img
+
+def load_cover_and_meta(
+    image_path: str | None,
+    cover_size: int,
+    psb_max_side: int,
+) -> tuple[np.ndarray, SourceMeta]:
     if image_path is None:
-        return make_synthetic_cover(cover_size)
+        img = make_synthetic_cover(cover_size)
+        meta = SourceMeta(
+            input_path=None,
+            input_ext=".png",
+            input_is_psb=False,
+            width=int(img.shape[1]),
+            height=int(img.shape[0]),
+            depth=8,
+        )
+        return img, meta
 
-    img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-    if img is None:
-        raise FileNotFoundError(f"无法读取图片: {image_path}")
-    return img
+    return read_cover_asset(image_path, max_side=psb_max_side)
 
+def save_main_asset(
+    out_dir: Path,
+    stem: str,
+    bgr: np.ndarray,
+    source_meta: SourceMeta,
+    emit_psb: bool,
+) -> dict:
+    result = {
+        "png": None,
+        "psb": None,
+        "psb_error": None,
+    }
+
+    png_path = out_dir / f"{stem}.png"
+    save_bgr_preview_png(png_path, bgr)
+    result["png"] = str(png_path)
+
+    if emit_psb and source_meta.input_is_psb:
+        psb_path = out_dir / f"{stem}.psb"
+        try:
+            save_bgr_as_flattened_psb_via_photoshop(psb_path, bgr)
+            result["psb"] = str(psb_path)
+        except Exception as exc:
+            result["psb_error"] = str(exc)
+
+    return result
 
 def build_users(num_users: int) -> list[UserRecord]:
     if num_users < 1:
@@ -129,8 +179,15 @@ def run_demo(args) -> dict:
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    cover = load_cover_image(args.image, args.cover_size)
-    save_rgb(out / "cover.png", cover)
+    # cover = load_cover_image(args.image, args.cover_size)
+    # save_rgb(out / "cover.png", cover)
+
+    cover, source_meta = load_cover_and_meta(
+        args.image,
+        args.cover_size,
+        args.psb_max_side,
+    )
+    cover_paths = save_main_asset(out, "cover", cover, source_meta, emit_psb=args.emit_psb)
 
     users = build_users(args.num_users)
     user_ids = {u.user_id for u in users}
@@ -154,7 +211,7 @@ def run_demo(args) -> dict:
     watermarked = {}
     clean_extract_ber = {}
     psnr_map = {}
-
+    user_outputs = {}
     for idx, user in enumerate(users):
         img = wm.embed(cover, codebook[idx], content_id=args.content_id).image
         watermarked[user.user_id] = img
@@ -167,18 +224,26 @@ def run_demo(args) -> dict:
             10.0 * np.log10((255.0 ** 2) / mse)
         )
 
-        save_rgb(out / f"{user.user_id}_watermarked.png", img)
+        #save_rgb(out / f"{user.user_id}_watermarked.png", img)
+        #ave_rgb(out / f"{user.user_id}_extracted_bits.png", wm.bits_to_noise_image(extracted))
+        user_paths = save_main_asset(
+            out, f"{user.user_id}_watermarked", img, source_meta, emit_psb=args.emit_psb
+        )
+        user_outputs[user.user_id] = user_paths
         save_rgb(out / f"{user.user_id}_extracted_bits.png", wm.bits_to_noise_image(extracted))
-
+        
     colluder_imgs = [watermarked[cid] for cid in colluder_ids]
 
     pirate_avg = average_collusion(colluder_imgs)
     avg_bits = wm.extract(pirate_avg, n_bits=args.code_length, content_id=args.content_id)
     avg_scores = accuse_symmetric(avg_bits, codebook, p)
     avg_ranking = rank_suspects(users, avg_scores)
-    save_rgb(out / "pirate_average.png", pirate_avg)
+    #save_rgb(out / "pirate_average.png", pirate_avg)
+    #save_rgb(out / "pirate_average_bits.png", wm.bits_to_noise_image(avg_bits))
+    pirate_avg_paths = save_main_asset(
+        out, "pirate_average", pirate_avg, source_meta, emit_psb=args.emit_psb
+    )
     save_rgb(out / "pirate_average_bits.png", wm.bits_to_noise_image(avg_bits))
-
     pirate_xor, xor_bits_fused = xor_collusion_via_reembed(
         base_image=pirate_avg,
         colluder_images=colluder_imgs,
@@ -189,9 +254,12 @@ def run_demo(args) -> dict:
     xor_bits = wm.extract(pirate_xor, n_bits=args.code_length, content_id=args.content_id)
     xor_scores = accuse_symmetric(xor_bits, codebook, p)
     xor_ranking = rank_suspects(users, xor_scores)
-    save_rgb(out / "pirate_xor.png", pirate_xor)
+    #save_rgb(out / "pirate_xor.png", pirate_xor)
+    #save_rgb(out / "pirate_xor_bits.png", wm.bits_to_noise_image(xor_bits))
+    pirate_xor_paths = save_main_asset(
+        out, "pirate_xor", pirate_xor, source_meta, emit_psb=args.emit_psb
+    )
     save_rgb(out / "pirate_xor_bits.png", wm.bits_to_noise_image(xor_bits))
-
     plot_scores(
         out / "scores.png",
         {
@@ -215,6 +283,10 @@ def run_demo(args) -> dict:
             "content_id": args.content_id,
             "master_key": args.master_key,
             "seed": args.seed,
+            "emit_psb": args.emit_psb,
+            "psb_max_side": args.psb_max_side,
+            "input_is_psb": source_meta.input_is_psb,
+            "input_depth": source_meta.depth,
         },
         "clean_ber": clean_extract_ber,
         "psnr": psnr_map,
@@ -225,6 +297,12 @@ def run_demo(args) -> dict:
         "xor_attack": {
             "top5": xor_ranking[:5],
             "top3_hit_count": sum(uid in colluder_ids for uid, _ in xor_ranking[:3]),
+        },
+        "outputs": {
+            "cover": cover_paths,
+            "users": user_outputs,
+            "pirate_average": pirate_avg_paths,
+            "pirate_xor": pirate_xor_paths,
         },
     }
 

@@ -127,7 +127,23 @@
                     <input name="seed" value="2026" class="form-control form-control-sm">
                   </div>
                 </div>
+                <div class="row g-2 mb-2">
+                  <div class="col-6">
+                    <label class="form-label">cover_size</label>
+                    <input name="cover_size" type="number" value="512" class="form-control form-control-sm">
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label">psb_max_side</label>
+                    <input name="psb_max_side" type="number" value="4096" class="form-control form-control-sm">
+                  </div>
+                </div>
 
+                <div class="form-check mb-3">
+                  <input class="form-check-input" type="checkbox" name="emit_psb" id="emit_psb">
+                  <label class="form-check-label" for="emit_psb">
+                    如果输入是 PSD/PSB，额外输出扁平单层 PSB
+                  </label>
+                </div>
                 <div class="text-end">
                   <button class="btn primary-action btn-success">运行并生成</button>
                 </div>
@@ -149,6 +165,10 @@
                   <li>合谋: {{ report.config.colluders|join(",") }}</li>
                   <li>delta: {{ report.config.delta }}</li>
                   <li>repeats: {{ report.config.repeats }}</li>
+                  <li>输入是否 PSB: {{ report.config.input_is_psb }}</li>
+                  <li>输入位深: {{ report.config.input_depth }}</li>
+                  <li>是否尝试导出 PSB: {{ report.config.emit_psb }}</li>
+                  <li>PSB 最大边: {{ report.config.psb_max_side }}</li>
                 </ul>
               {% endif %}
             </div>

@@ -123,13 +123,13 @@
                   <div id="{{ viewer_id }}" class="wm-viewer">
                     <div class="viewer-stage mb-3">
                       <img
-                        src="/results/{{ cover }}"
+                        src="{{ url_for('results_file', filename=cover, out_dir=out_dir) }}"
                         alt="原图"
                         class="stage-layer cover-layer active"
                         data-mode="cover"
                       >
                       <img
-                        src="/results/{{ w }}"
+                        src="{{ url_for('results_file', filename=w, out_dir=out_dir) }}"
                         alt="{{ u.user_id }} 带水印图"
                         class="stage-layer watermarked-layer"
                         data-mode="watermarked"
@@ -157,6 +157,23 @@
                       <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="enhanced-diff">
                         增强差异图
                       </button>
+                    </div>
+
+                    {% set w_psb = u.user_id + '_watermarked.psb' %}
+                    <div class="d-flex gap-2 flex-wrap">
+                      <a class="btn btn-sm btn-outline-secondary"
+                        href="{{ url_for('results_file', filename=w, out_dir=out_dir) }}"
+                        download>
+                        下载 PNG
+                      </a>
+
+                      {% if w_psb in images %}
+                        <a class="btn btn-sm btn-outline-primary"
+                          href="{{ url_for('results_file', filename=w_psb, out_dir=out_dir) }}"
+                          download>
+                          下载 PSB
+                        </a>
+                      {% endif %}
                     </div>
 
                     <div class="enhance-box mb-3">

@@ -13,6 +13,7 @@ from flask import (
     redirect,
     url_for,
     flash,
+    abort,
 )
 
 import demo as demo_mod
@@ -50,20 +51,28 @@ def save_users(users: list[dict[str, str]]) -> None:
     # sync to demo module's USER_DB so the demo runner will use the updated list
     demo_mod.USER_DB = [UserRecord(user_id=u["user_id"], user_key=u["user_key"]) for u in users]
 
+def resolve_out_dir(out_dir: str | None, default: Path | None = None) -> Path:
+    if out_dir:
+        target = (BASE_DIR / out_dir).resolve()
+    else:
+        target = (default or RESULTS_DIR).resolve()
+
+    try:
+        target.relative_to(BASE_DIR.resolve())
+    except ValueError:
+        abort(404)
+
+    return target
 
 @app.route("/")
 def index() -> str:
     users = load_users()
 
-    # allow optional out_dir override via query param
     out_dir_param = request.args.get("out_dir")
-    if out_dir_param:
-        out_path = (BASE_DIR / out_dir_param).resolve()
-    else:
-        out_path = RESULTS_DIR
+    out_path = resolve_out_dir(out_dir_param, default=RESULTS_DIR)
 
     images = sorted([p.name for p in out_path.glob("*.png")]) if out_path.exists() else []
-
+    
     report = None
     report_path = out_path / "report.json"
     if report_path.exists():
@@ -112,10 +121,9 @@ def delete_user():
 
 @app.route("/run", methods=["POST"])
 def run():
-    # collect form fields and build args for demo.run_demo
     image = request.form.get("image") or None
     num_users = int(request.form.get("num_users", 8))
-    code_length = int(request.form.get("code_length", 512))
+    code_length = int(request.form.get("code_length", 320))
     colluders = request.form.get("colluders", "").strip()
     delta = float(request.form.get("delta", 26.0))
     repeats = int(request.form.get("repeats", 6))
@@ -124,13 +132,25 @@ def run():
     seed = int(request.form.get("seed", 2026))
     cover_size = int(request.form.get("cover_size", 512))
 
+    # 新增：PSB 相关参数
+    emit_psb = request.form.get("emit_psb") == "on"
+    psb_max_side = int(request.form.get("psb_max_side", 4096))
+
     users = load_users()
     if num_users < 1 or num_users > len(users):
         flash(f"num_users 必须在 1 和 {len(users)} 之间", "danger")
         return redirect(url_for("index"))
 
-    out_dir_form = request.form.get("out_dir", "results")
-    out_path = (BASE_DIR / out_dir_form)
+    out_dir_form = request.form.get("out_dir", "results").strip() or "results"
+    out_path = (BASE_DIR / out_dir_form).resolve()
+
+    # 安全限制：禁止跳出项目目录
+    try:
+        out_path.relative_to(BASE_DIR.resolve())
+    except ValueError:
+        flash("out_dir 非法，必须位于项目目录内", "danger")
+        return redirect(url_for("index"))
+
     out_path.mkdir(parents=True, exist_ok=True)
 
     args = SimpleNamespace(
@@ -145,59 +165,89 @@ def run():
         content_id=content_id,
         seed=seed,
         cover_size=cover_size,
+        emit_psb=emit_psb,
+        psb_max_side=psb_max_side,
     )
 
     try:
-        save_users(users)  # ensure demo.USER_DB in sync
+        save_users(users)
         report = demo_mod.run_demo(args)
-        flash("水印嵌入并检测完成", "success")
-    except Exception as exc:  # pragma: no cover - surface to frontend
+
+        output_errors = []
+        outputs = report.get("outputs", {}) if isinstance(report, dict) else {}
+
+        # 顶层输出：cover / pirate_average / pirate_xor
+        for name, item in outputs.items():
+            if name == "users":
+                continue
+            if isinstance(item, dict) and item.get("psb_error"):
+                output_errors.append(f"{name}: {item['psb_error']}")
+
+        # 用户级输出：user_1 / user_2 / ...
+        user_outputs = outputs.get("users", {})
+        if isinstance(user_outputs, dict):
+            for user_id, item in user_outputs.items():
+                if isinstance(item, dict) and item.get("psb_error"):
+                    output_errors.append(f"{user_id}: {item['psb_error']}")
+
+        if output_errors:
+            flash("运行完成，但部分 PSB 导出失败：" + " | ".join(output_errors), "warning")
+        else:
+            flash("水印嵌入并检测完成", "success")
+
+    except Exception as exc:
         flash(f"运行失败: {exc}", "danger")
 
-    # redirect back to index and show the chosen out_dir
     return redirect(url_for("index", out_dir=str(out_path.relative_to(BASE_DIR))))
-
-
 
 @app.route("/view/users")
 def view_users():
-    out_dir = request.args.get("out_dir", "results")
-    out_path = (BASE_DIR / out_dir)
-    images = sorted([p.name for p in out_path.glob("*.png")]) if out_path.exists() else []
+    out_path = resolve_out_dir(request.args.get("out_dir"), default=RESULTS_DIR)
+    files = sorted([p.name for p in out_path.iterdir() if p.is_file()]) if out_path.exists() else []
     users = load_users()
-    return render_template("users_view.html", users=users, images=images, out_dir=str(out_path.relative_to(BASE_DIR)))
-
+    return render_template(
+        "users_view.html",
+        users=users,
+        images=files,
+        out_dir=str(out_path.relative_to(BASE_DIR)),
+    )
 
 @app.route("/view/collusion")
 def view_collusion():
-    out_dir = request.args.get("out_dir", "results")
-    out_path = (BASE_DIR / out_dir)
-    images = sorted([p.name for p in out_path.glob("*.png")]) if out_path.exists() else []
-    return render_template("collusion_view.html", images=images, out_dir=str(out_path.relative_to(BASE_DIR)))
+    out_path = resolve_out_dir(request.args.get("out_dir"), default=RESULTS_DIR)
+    #images = sorted([p.name for p in out_path.glob("*.png")]) if out_path.exists() else []
+    files = sorted([p.name for p in out_path.iterdir() if p.is_file()]) if out_path.exists() else []
+    return render_template("collusion_view.html", images=files, out_dir=str(out_path.relative_to(BASE_DIR)))
 
 
 @app.route("/results/<path:filename>")
 def results_file(filename: str):
-    return send_from_directory(str(RESULTS_DIR), filename)
+    out_path = resolve_out_dir(request.args.get("out_dir"), default=RESULTS_DIR)
+    return send_from_directory(str(out_path), filename)
 
 
 @app.route("/report")
 def view_report():
-    out_dir = request.args.get("out_dir")
-    if out_dir:
-        out_path = (BASE_DIR / out_dir)
-    else:
-        out_path = RESULTS_DIR
+    out_path = resolve_out_dir(request.args.get("out_dir"), default=RESULTS_DIR)
 
     report_path = out_path / "report.json"
     if not report_path.exists():
-        return render_template("report.html", report_text=None, out_dir=str(out_path.relative_to(BASE_DIR)))
+        return render_template(
+            "report.html",
+            report_text=None,
+            out_dir=str(out_path.relative_to(BASE_DIR)),
+        )
+
     try:
         report_text = report_path.read_text(encoding="utf-8")
     except Exception:
         report_text = None
-    return render_template("report.html", report_text=report_text, out_dir=str(out_path.relative_to(BASE_DIR)))
 
+    return render_template(
+        "report.html",
+        report_text=report_text,
+        out_dir=str(out_path.relative_to(BASE_DIR)),
+    )
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")
