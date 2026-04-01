@@ -6,6 +6,43 @@
     <title>Pic Watermark Demo</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
+    <style>
+      .tip-card {
+        border: 1px solid #e9ecef;
+        border-radius: 16px;
+        background: #fff;
+      }
+      .tip-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.3rem 0.65rem;
+        border-radius: 999px;
+        background: #f3f5f7;
+        font-size: 0.85rem;
+        color: #495057;
+        margin-right: 0.4rem;
+        margin-bottom: 0.4rem;
+      }
+      .mini-muted {
+        font-size: 0.88rem;
+        color: #6c757d;
+      }
+      .mono-box {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.85rem;
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 12px;
+        padding: 0.75rem;
+        word-break: break-all;
+      }
+      .mode-help {
+        display: none;
+      }
+      .mode-help.active {
+        display: block;
+      }
+    </style>
   </head>
   <body class="bg-light">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
@@ -28,7 +65,7 @@
           <div class="card mb-3 large-card">
             <div class="card-header">用户管理</div>
             <div class="card-body">
-              <table class="table table-sm">
+              <table class="table table-sm align-middle">
                 <thead><tr><th>ID</th><th>Key</th><th></th></tr></thead>
                 <tbody>
                   {% for u in users %}
@@ -86,6 +123,32 @@
                   <label class="form-label">输出目录（相对项目根）</label>
                   <input name="out_dir" class="form-control form-control-sm" value="{{ current_out_dir or 'results' }}">
                 </div>
+
+                <div class="row g-2 mb-2">
+                  <div class="col-md-6">
+                    <label class="form-label">处理模式</label>
+                    <select name="processing_mode" id="processing_mode" class="form-select form-select-sm">
+                      <option value="auto" selected>auto</option>
+                      <option value="default">default</option>
+                      <option value="large_raster">large_raster</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">tile_size</label>
+                    <input name="tile_size" type="number" min="256" step="256" value="2048" class="form-control form-control-sm">
+                  </div>
+                </div>
+
+                <div id="mode_help_auto" class="alert alert-light border mode-help active py-2 mb-2">
+                  自动根据位深和文件大小切换
+                </div>
+                <div id="mode_help_default" class="alert alert-light border mode-help py-2 mb-2">
+                  default链路适合普通小图
+                </div>
+                <div id="mode_help_large_raster" class="alert alert-warning mode-help py-2 mb-2">
+                  large raster适合大图文件
+                </div>
+
                 <div class="row g-2 mb-2">
                   <div class="col-6">
                     <label class="form-label">用户数</label>
@@ -103,21 +166,22 @@
                 </div>
 
                 <div class="row g-2 mb-2">
-                  <div class="col-6">
+                  <div class="col-4">
                     <label class="form-label">delta</label>
                     <input name="delta" type="number" step="0.1" value="8.0" class="form-control form-control-sm">
                   </div>
-                  <div class="col-6">
+                  <div class="col-4">
                     <label class="form-label">repeats</label>
                     <input name="repeats" type="number" value="2" class="form-control form-control-sm">
                   </div>
-                  <div class="mb-2">
-                    <label class="form-label">delta_mode</label>
-                    <select name="delta_mode" class="form-select form-select-sm">
-                      <option value="normalized_8bit" selected>normalized_8bit（推荐）</option>
-                      <option value="native">native</option>
-                    </select>
-                  </div>
+                </div>
+
+                <div class="mb-2">
+                  <label class="form-label">delta_mode</label>
+                  <select name="delta_mode" class="form-select form-select-sm">
+                    <option value="normalized_8bit" selected>normalized_8bit（推荐）</option>
+                    <option value="native">native</option>
+                  </select>
                 </div>
 
                 <div class="mb-2">
@@ -148,7 +212,7 @@
                 <div class="form-check mb-3">
                   <input class="form-check-input" type="checkbox" name="emit_psb" id="emit_psb">
                   <label class="form-check-label" for="emit_psb">
-                    输出扁平单层PSB文件
+                    输出扁平单层 PSB 文件
                   </label>
                 </div>
                 <div class="text-end">
@@ -172,6 +236,21 @@
                 <div class="mb-2">
                   <label class="form-label">或直接填写图片路径</label>
                   <input name="extract_image_path" class="form-control form-control-sm" placeholder="path/to/watermarked_image.png">
+                </div>
+
+                <div class="row g-2 mb-2">
+                  <div class="col-md-6">
+                    <label class="form-label">提取模式</label>
+                    <select name="extract_route_mode" id="extract_route_mode" class="form-select form-select-sm">
+                      <option value="auto" selected>auto</option>
+                      <option value="default">default</option>
+                      <option value="large_raster">large_raster</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">extract_tile_size</label>
+                    <input name="extract_tile_size" type="number" min="256" step="256" value="2048" class="form-control form-control-sm">
+                  </div>
                 </div>
 
                 <div class="row g-2 mb-2">
@@ -223,6 +302,8 @@
                   <div><strong>图片：</strong>{{ extract_result.image_path }}</div>
                   <div><strong>提取字符串：</strong>{{ extract_result.extracted_text if extract_result.extracted_text else '解析失败' }}</div>
                   <div><strong>字符串校验：</strong>{{ '通过' if extract_result.text_ok else '失败' }}</div>
+                  <div><strong>路由：</strong>{{ extract_result.route }}</div>
+                  <div><strong>路由原因：</strong>{{ extract_result.route_reason }}</div>
                   <div><strong>输入是否 PSB：</strong>{{ extract_result.input_is_psb }}</div>
                   <div><strong>输入位深：</strong>{{ extract_result.input_depth }}</div>
                   <div><strong>提取位数：</strong>{{ extract_result.display_bits_len }}</div>
@@ -239,20 +320,23 @@
               <p class="mb-1">图片数量: <strong>{{ images|length }}</strong></p>
               {% if report %}
                 <hr>
-                <p class="mb-1">最近运行配置：</p>
-                <ul class="list-unstyled small">
-                  <li>码长: {{ report.config.code_length }}</li>
-                  <li>合谋: {{ report.config.colluders|join(",") }}</li>
-                  <li>delta: {{ report.config.delta }}</li>
-                  <li>repeats: {{ report.config.repeats }}</li>
-                  <li>输入是否 PSB: {{ report.config.input_is_psb }}</li>
-                  <li>输入位深: {{ report.config.input_depth }}</li>
-                  <li>是否尝试导出 PSB: {{ report.config.emit_psb }}</li>
-                  <li>PSB 最大边: {{ report.config.psb_max_side }}</li>
+                <p class="mb-2">最近运行配置：</p>
+                <ul class="list-unstyled small mb-0">
+                  <li>模式: {{ report.mode if report.mode else '-' }}</li>
+                  <li>应用路由: {{ report.app_route if report.app_route else '-' }}</li>
+                  <li>路由原因: {{ report.route_reason if report.route_reason else '-' }}</li>
+                  <li>码长: {{ report.config.code_length if report.config else (report.total_bits if report.total_bits else '-') }}</li>
+                  <li>delta: {{ report.config.delta if report.config else report.delta }}</li>
+                  <li>repeats: {{ report.config.repeats if report.config else report.repeats }}</li>
+                  <li>tile_size: {{ report.tile_size if report.tile_size else '-' }}</li>
+                  <li>单用户链路用户: {{ report.selected_user_id if report.selected_user_id else (report.user_id if report.user_id else '-') }}</li>
+                  <li>输入是否 PSB: {{ report.config.input_is_psb if report.config else report.input_is_psb }}</li>
+                  <li>输入位深: {{ report.config.input_depth if report.config else report.input_depth }}</li>
+                  <li>是否尝试导出 PSB: {{ report.config.emit_psb if report.config else (report.output_psb is not none) }}</li>
+                  <li>PSB 最大边: {{ report.config.psb_max_side if report.config else '-' }}</li>
                 </ul>
               {% endif %}
             </div>
-          </div>
           </div>
         </div>
       </div>
@@ -260,14 +344,12 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-      // Make left top card (用户管理) and right top card (运行配置) equal height
       (function(){
         const equalize = () => {
           try {
             const leftBody = document.querySelector('.col-md-4 .large-card .card-body');
             const rightBody = document.querySelector('.col-md-8 .large-card .card-body');
             if (!leftBody || !rightBody) return;
-            // reset
             leftBody.style.minHeight = '';
             rightBody.style.minHeight = '';
             const lh = leftBody.getBoundingClientRect().height;
@@ -275,17 +357,33 @@
             const h = Math.max(lh, rh);
             leftBody.style.minHeight = h + 'px';
             rightBody.style.minHeight = h + 'px';
-          } catch (e) { /* ignore */ }
+          } catch (e) { }
+        };
+
+        const syncModeHelp = () => {
+          const select = document.getElementById('processing_mode');
+          if (!select) return;
+          const value = select.value || 'auto';
+          document.querySelectorAll('.mode-help').forEach(el => el.classList.remove('active'));
+          const target = document.getElementById('mode_help_' + value);
+          if (target) target.classList.add('active');
         };
 
         let t = null;
-        window.addEventListener('load', equalize);
+        window.addEventListener('load', () => {
+          equalize();
+          syncModeHelp();
+        });
         window.addEventListener('resize', () => {
           clearTimeout(t);
           t = setTimeout(equalize, 120);
         });
+
+        const select = document.getElementById('processing_mode');
+        if (select) {
+          select.addEventListener('change', syncModeHelp);
+        }
       })();
     </script>
   </body>
 </html>
-

@@ -7,10 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
     <style>
-      body {
-        background: #f8f9fa;
-      }
-
+      body { background: #f8f9fa; }
       .result-card {
         border: 0;
         border-radius: 16px;
@@ -18,13 +15,11 @@
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
         background: #fff;
       }
-
       .result-card .card-header {
         background: #fff;
         border-bottom: 1px solid #eef1f4;
         font-weight: 700;
       }
-
       .viewer-stage {
         position: relative;
         width: 100%;
@@ -37,7 +32,6 @@
         align-items: center;
         justify-content: center;
       }
-
       .stage-layer {
         width: 100%;
         height: auto;
@@ -45,16 +39,8 @@
         object-fit: contain;
         background: #fff;
       }
-
-      .stage-layer.active {
-        display: block;
-      }
-
-      canvas.stage-layer {
-        width: 100%;
-        height: auto;
-      }
-
+      .stage-layer.active { display: block; }
+      canvas.stage-layer { width: 100%; height: auto; }
       .placeholder-box {
         width: 100%;
         min-height: 280px;
@@ -67,32 +53,20 @@
         text-align: center;
         padding: 24px;
       }
-
-      .mode-btns .btn {
-        min-width: 96px;
-      }
-
+      .mode-btns .btn { min-width: 96px; }
       .range-label {
         font-size: 13px;
         color: #6c757d;
         min-width: 84px;
       }
-
       .gain-value {
         font-weight: 700;
         color: #212529;
         min-width: 40px;
         text-align: right;
       }
-
-      .enhance-box {
-        display: none;
-      }
-
-      .enhance-box.active {
-        display: block;
-      }
-
+      .enhance-box { display: none; }
+      .enhance-box.active { display: block; }
       .score-image {
         width: 100%;
         height: auto;
@@ -108,231 +82,199 @@
 
       <h5 class="mb-3">输出目录: {{ out_dir }}</h5>
 
-      <div class="row">
-        <div class="col-lg-6 mb-4">
-          <div class="card result-card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-              <span>Average</span>
-              <span class="badge text-bg-light border">合谋结果</span>
-            </div>
-
-            <div class="card-body">
-              {% if 'cover.png' in images and 'pirate_average.png' in images %}
-                <div class="attack-viewer">
-                  <div class="viewer-stage mb-3">
-                    <img
-                      src="{{ url_for('results_file', filename='cover.png', out_dir=out_dir) }}"
-                      alt="原图"
-                      class="stage-layer cover-layer active"
-                      data-mode="cover"
-                    >
-                    <img
-                      src="{{ url_for('results_file', filename='pirate_average.png', out_dir=out_dir) }}"
-                      alt="Average 合谋图"
-                      class="stage-layer attacked-layer"
-                      data-mode="attacked"
-                    >
-                    <canvas
-                      class="stage-layer raw-diff-layer"
-                      data-mode="raw-diff"
-                    ></canvas>
-                    <canvas
-                      class="stage-layer enhanced-diff-layer"
-                      data-mode="enhanced-diff"
-                    ></canvas>
-                  </div>
-
-                  <div class="d-flex flex-wrap gap-2 mode-btns mb-3">
-                    <button type="button" class="btn btn-primary btn-sm active" data-switch-mode="cover">
-                      原图
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="attacked">
-                      合谋图
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="raw-diff">
-                      原始差异图
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="enhanced-diff">
-                      增强差异图
-                    </button>
-                  </div>
-
-                  {% if report and report.average_attack %}
-                    <div class="alert alert-light border mt-3 mb-0">
-                      <div><strong>提取字符串：</strong>{{ report.average_attack.decoded_text if report.average_attack.decoded_text else '解析失败' }}</div>
-                      <div><strong>字符串校验：</strong>{{ '通过' if report.average_attack.decoded_text_ok else '失败' }}</div>
-                    </div>
-                  {% endif %}
-
-                  <div class="enhance-box mb-2">
-                    <div class="d-flex align-items-center gap-2">
-                      <span class="range-label">增强倍数</span>
-                      <input
-                        type="range"
-                        class="form-range enhance-slider"
-                        min="1"
-                        max="40"
-                        step="1"
-                        value="12"
-                      >
-                      <span class="gain-value">12x</span>
-                    </div>
-                  </div>
-                </div>
-              {% else %}
-                <div class="placeholder-box">
-                  缺少 cover.png 或 pirate_average.png
-                </div>
-              {% endif %}
-              <div class="d-flex gap-2 flex-wrap mt-3">
-                <a class="btn btn-sm btn-outline-secondary"
-                  href="{{ url_for('results_file', filename='pirate_average.png', out_dir=out_dir) }}"
-                  download>
-                  下载 PNG
-                </a>
-
-                {% if 'pirate_average.tif' in images %}
-                  <a class="btn btn-sm btn-outline-success"
-                    href="{{ url_for('results_file', filename='pirate_average.tif', out_dir=out_dir) }}"
-                    download>
-                    下载 TIFF
-                  </a>
-                {% endif %}
-
-                {% if 'pirate_average.psb' in images %}
-                  <a class="btn btn-sm btn-outline-primary"
-                    href="{{ url_for('results_file', filename='pirate_average.psb', out_dir=out_dir) }}"
-                    download>
-                    下载 PSB
-                  </a>
-                {% endif %}
-              </div>
-            </div>  
-          </div>
+      {% if single_file_view %}
+        <div class="alert alert-warning">
+          当前结果来自<strong>单文件链路</strong>（{{ single_file_view.route }}），没有多用户合谋攻击与评分图可展示。
         </div>
 
-        <div class="col-lg-6 mb-4">
-          <div class="card result-card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-              <span>XOR-like</span>
-              <span class="badge text-bg-light border">合谋结果</span>
-            </div>
+        <div class="card result-card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>单文件结果摘要</span>
+            <span class="badge text-bg-light border">{{ single_file_view.mode }}</span>
+          </div>
+          <div class="card-body">
+            {% if single_file_view.preview_png %}
+              <img
+                src="{{ url_for('results_file', filename=single_file_view.preview_png, out_dir=out_dir) }}"
+                alt="预览图"
+                class="score-image mb-3"
+              >
+            {% else %}
+              <div class="placeholder-box mb-3">
+                当前单文件链路没有可直接显示的 PNG 预览。
+              </div>
+            {% endif %}
 
-            <div class="card-body">
-              {% if 'cover.png' in images and 'pirate_xor.png' in images %}
-                <div class="attack-viewer">
-                  <div class="viewer-stage mb-3">
-                    <img
-                      src="{{ url_for('results_file', filename='cover.png', out_dir=out_dir) }}"
-                      alt="原图"
-                      class="stage-layer cover-layer active"
-                      data-mode="cover"
-                    >
-                    <img
-                      src="{{ url_for('results_file', filename='pirate_xor.png', out_dir=out_dir) }}"
-                      alt="XOR-like 合谋图"
-                      class="stage-layer attacked-layer"
-                      data-mode="attacked"
-                    >
-                    <canvas
-                      class="stage-layer raw-diff-layer"
-                      data-mode="raw-diff"
-                    ></canvas>
-                    <canvas
-                      class="stage-layer enhanced-diff-layer"
-                      data-mode="enhanced-diff"
-                    ></canvas>
-                  </div>
-
-                  <div class="d-flex flex-wrap gap-2 mode-btns mb-3">
-                    <button type="button" class="btn btn-primary btn-sm active" data-switch-mode="cover">
-                      原图
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="attacked">
-                      合谋图
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="raw-diff">
-                      原始差异图
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="enhanced-diff">
-                      增强差异图
-                    </button>
-                  </div>
-
-                  {% if report and report.xor_attack %}
-                    <div class="alert alert-light border mt-3 mb-0">
-                      <div><strong>提取字符串：</strong>{{ report.xor_attack.decoded_text if report.xor_attack.decoded_text else '解析失败' }}</div>
-                      <div><strong>字符串校验：</strong>{{ '通过' if report.xor_attack.decoded_text_ok else '失败' }}</div>
-                    </div>
-                  {% endif %}
-
-                  <div class="enhance-box mb-2">
-                    <div class="d-flex align-items-center gap-2">
-                      <span class="range-label">增强倍数</span>
-                      <input
-                        type="range"
-                        class="form-range enhance-slider"
-                        min="1"
-                        max="40"
-                        step="1"
-                        value="12"
-                      >
-                      <span class="gain-value">12x</span>
-                    </div>
-                  </div>
-                </div>
-              {% else %}
-                <div class="placeholder-box">
-                  缺少 cover.png 或 pirate_xor.png
-                </div>
-              {% endif %}
-              <div class="d-flex gap-2 flex-wrap mt-3">
+            <div class="d-flex gap-2 flex-wrap mb-3">
+              {% if single_file_view.preview_png %}
                 <a class="btn btn-sm btn-outline-secondary"
-                  href="{{ url_for('results_file', filename='pirate_xor.png', out_dir=out_dir) }}"
+                  href="{{ url_for('results_file', filename=single_file_view.preview_png, out_dir=out_dir) }}"
                   download>
                   下载 PNG
                 </a>
+              {% endif %}
+              {% if single_file_view.output_tif %}
+                <a class="btn btn-sm btn-outline-success"
+                  href="{{ url_for('results_file', filename=single_file_view.output_tif, out_dir=out_dir) }}"
+                  download>
+                  下载 TIFF
+                </a>
+              {% endif %}
+              {% if single_file_view.output_psb %}
+                <a class="btn btn-sm btn-outline-primary"
+                  href="{{ url_for('results_file', filename=single_file_view.output_psb, out_dir=out_dir) }}"
+                  download>
+                  下载 PSB
+                </a>
+              {% endif %}
+              {% if single_file_view.plan_json %}
+                <a class="btn btn-sm btn-outline-dark"
+                  href="{{ url_for('results_file', filename=single_file_view.plan_json, out_dir=out_dir) }}"
+                  download>
+                  下载 plan.json
+                </a>
+              {% endif %}
+            </div>
 
-                {% if 'pirate_xor.tif' in images %}
-                  <a class="btn btn-sm btn-outline-success"
-                    href="{{ url_for('results_file', filename='pirate_xor.tif', out_dir=out_dir) }}"
-                    download>
-                    下载 TIFF
-                  </a>
-                {% endif %}
+            <div class="alert alert-light border mb-0">
+              <div><strong>用户：</strong>{{ single_file_view.user_id if single_file_view.user_id else '未记录' }}</div>
+              <div><strong>提取字符串：</strong>{{ single_file_view.extracted_text if single_file_view.extracted_text else '解析失败' }}</div>
+              <div><strong>字符串校验：</strong>{{ '通过' if single_file_view.text_ok else '失败' }}</div>
+              <div><strong>tile_size：</strong>{{ single_file_view.tile_size if single_file_view.tile_size else '-' }}</div>
+              <div><strong>tile_count：</strong>{{ single_file_view.tile_count if single_file_view.tile_count else '-' }}</div>
+              {% if single_file_view.fingerprint_ber is not none %}
+                <div><strong>指纹 BER：</strong>{{ '%.4f'|format(single_file_view.fingerprint_ber) }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="row">
+          <div class="col-lg-6 mb-4">
+            <div class="card result-card h-100">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Average</span>
+                <span class="badge text-bg-light border">合谋结果</span>
+              </div>
 
-                {% if 'pirate_xor.psb' in images %}
-                  <a class="btn btn-sm btn-outline-primary"
-                    href="{{ url_for('results_file', filename='pirate_xor.psb', out_dir=out_dir) }}"
-                    download>
-                    下载 PSB
-                  </a>
+              <div class="card-body">
+                {% if 'cover.png' in images and 'pirate_average.png' in images %}
+                  <div class="attack-viewer">
+                    <div class="viewer-stage mb-3">
+                      <img src="{{ url_for('results_file', filename='cover.png', out_dir=out_dir) }}" alt="原图" class="stage-layer cover-layer active" data-mode="cover">
+                      <img src="{{ url_for('results_file', filename='pirate_average.png', out_dir=out_dir) }}" alt="Average 合谋图" class="stage-layer attacked-layer" data-mode="attacked">
+                      <canvas class="stage-layer raw-diff-layer" data-mode="raw-diff"></canvas>
+                      <canvas class="stage-layer enhanced-diff-layer" data-mode="enhanced-diff"></canvas>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mode-btns mb-3">
+                      <button type="button" class="btn btn-primary btn-sm active" data-switch-mode="cover">原图</button>
+                      <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="attacked">合谋图</button>
+                      <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="raw-diff">原始差异图</button>
+                      <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="enhanced-diff">增强差异图</button>
+                    </div>
+
+                    {% if report and report.average_attack %}
+                      <div class="alert alert-light border mt-3 mb-0">
+                        <div><strong>提取字符串：</strong>{{ report.average_attack.decoded_text if report.average_attack.decoded_text else '解析失败' }}</div>
+                        <div><strong>字符串校验：</strong>{{ '通过' if report.average_attack.decoded_text_ok else '失败' }}</div>
+                      </div>
+                    {% endif %}
+
+                    <div class="enhance-box mb-2">
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="range-label">增强倍数</span>
+                        <input type="range" class="form-range enhance-slider" min="1" max="40" step="1" value="12">
+                        <span class="gain-value">12x</span>
+                      </div>
+                    </div>
+                  </div>
+                {% else %}
+                  <div class="placeholder-box">缺少 cover.png 或 pirate_average.png</div>
                 {% endif %}
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('results_file', filename='pirate_average.png', out_dir=out_dir) }}" download>下载 PNG</a>
+                  {% if 'pirate_average.tif' in images %}
+                    <a class="btn btn-sm btn-outline-success" href="{{ url_for('results_file', filename='pirate_average.tif', out_dir=out_dir) }}" download>下载 TIFF</a>
+                  {% endif %}
+                  {% if 'pirate_average.psb' in images %}
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('results_file', filename='pirate_average.psb', out_dir=out_dir) }}" download>下载 PSB</a>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6 mb-4">
+            <div class="card result-card h-100">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <span>XOR-like</span>
+                <span class="badge text-bg-light border">合谋结果</span>
+              </div>
+
+              <div class="card-body">
+                {% if 'cover.png' in images and 'pirate_xor.png' in images %}
+                  <div class="attack-viewer">
+                    <div class="viewer-stage mb-3">
+                      <img src="{{ url_for('results_file', filename='cover.png', out_dir=out_dir) }}" alt="原图" class="stage-layer cover-layer active" data-mode="cover">
+                      <img src="{{ url_for('results_file', filename='pirate_xor.png', out_dir=out_dir) }}" alt="XOR-like 合谋图" class="stage-layer attacked-layer" data-mode="attacked">
+                      <canvas class="stage-layer raw-diff-layer" data-mode="raw-diff"></canvas>
+                      <canvas class="stage-layer enhanced-diff-layer" data-mode="enhanced-diff"></canvas>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mode-btns mb-3">
+                      <button type="button" class="btn btn-primary btn-sm active" data-switch-mode="cover">原图</button>
+                      <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="attacked">合谋图</button>
+                      <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="raw-diff">原始差异图</button>
+                      <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="enhanced-diff">增强差异图</button>
+                    </div>
+
+                    {% if report and report.xor_attack %}
+                      <div class="alert alert-light border mt-3 mb-0">
+                        <div><strong>提取字符串：</strong>{{ report.xor_attack.decoded_text if report.xor_attack.decoded_text else '解析失败' }}</div>
+                        <div><strong>字符串校验：</strong>{{ '通过' if report.xor_attack.decoded_text_ok else '失败' }}</div>
+                      </div>
+                    {% endif %}
+
+                    <div class="enhance-box mb-2">
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="range-label">增强倍数</span>
+                        <input type="range" class="form-range enhance-slider" min="1" max="40" step="1" value="12">
+                        <span class="gain-value">12x</span>
+                      </div>
+                    </div>
+                  </div>
+                {% else %}
+                  <div class="placeholder-box">缺少 cover.png 或 pirate_xor.png</div>
+                {% endif %}
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('results_file', filename='pirate_xor.png', out_dir=out_dir) }}" download>下载 PNG</a>
+                  {% if 'pirate_xor.tif' in images %}
+                    <a class="btn btn-sm btn-outline-success" href="{{ url_for('results_file', filename='pirate_xor.tif', out_dir=out_dir) }}" download>下载 TIFF</a>
+                  {% endif %}
+                  {% if 'pirate_xor.psb' in images %}
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('results_file', filename='pirate_xor.psb', out_dir=out_dir) }}" download>下载 PSB</a>
+                  {% endif %}
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="card result-card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span>评分图</span>
-          <span class="badge text-bg-light border">Tardos score</span>
+        <div class="card result-card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>评分图</span>
+            <span class="badge text-bg-light border">Tardos score</span>
+          </div>
+          <div class="card-body">
+            {% if 'scores.png' in images %}
+              <img src="{{ url_for('results_file', filename='scores.png', out_dir=out_dir) }}" alt="评分图" class="score-image">
+            {% else %}
+              <div class="placeholder-box">无评分图像</div>
+            {% endif %}
+          </div>
         </div>
-        <div class="card-body">
-          {% if 'scores.png' in images %}
-            <img
-              src="{{ url_for('results_file', filename='scores.png', out_dir=out_dir) }}"
-              alt="评分图"
-              class="score-image"
-            >
-          {% else %}
-            <div class="placeholder-box">
-              无评分图像
-            </div>
-          {% endif %}
-        </div>
-      </div>
+      {% endif %}
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -363,23 +305,19 @@
         const w = coverImg.naturalWidth;
         const h = coverImg.naturalHeight;
         if (!w || !h) return;
-
         canvas.width = w;
         canvas.height = h;
-
         const coverData = getImageData(coverImg).data;
         const attackedData = getImageData(attackedImg).data;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         const out = ctx.createImageData(w, h);
         const outData = out.data;
-
         for (let i = 0; i < coverData.length; i += 4) {
           outData[i] = Math.abs(attackedData[i] - coverData[i]);
           outData[i + 1] = Math.abs(attackedData[i + 1] - coverData[i + 1]);
           outData[i + 2] = Math.abs(attackedData[i + 2] - coverData[i + 2]);
           outData[i + 3] = 255;
         }
-
         ctx.putImageData(out, 0, 0);
       }
 
@@ -387,29 +325,23 @@
         const w = coverImg.naturalWidth;
         const h = coverImg.naturalHeight;
         if (!w || !h) return;
-
         canvas.width = w;
         canvas.height = h;
-
         const coverData = getImageData(coverImg).data;
         const attackedData = getImageData(attackedImg).data;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         const out = ctx.createImageData(w, h);
         const outData = out.data;
-
         for (let i = 0; i < coverData.length; i += 4) {
           const dr = Math.abs(attackedData[i] - coverData[i]);
           const dg = Math.abs(attackedData[i + 1] - coverData[i + 1]);
           const db = Math.abs(attackedData[i + 2] - coverData[i + 2]);
-
           const gray = Math.min(255, ((dr + dg + db) / 3) * gain);
-
           outData[i] = gray;
           outData[i + 1] = gray;
           outData[i + 2] = gray;
           outData[i + 3] = 255;
         }
-
         ctx.putImageData(out, 0, 0);
       }
 
@@ -417,15 +349,10 @@
         const layers = viewer.querySelectorAll('.stage-layer');
         const buttons = viewer.querySelectorAll('[data-switch-mode]');
         const enhanceBox = viewer.querySelector('.enhance-box');
-
         layers.forEach(function (layer) {
-          if (layer.dataset.mode === mode) {
-            layer.classList.add('active');
-          } else {
-            layer.classList.remove('active');
-          }
+          if (layer.dataset.mode === mode) layer.classList.add('active');
+          else layer.classList.remove('active');
         });
-
         buttons.forEach(function (btn) {
           if (btn.dataset.switchMode === mode) {
             btn.classList.remove('btn-outline-primary');
@@ -437,11 +364,9 @@
             btn.classList.remove('active');
           }
         });
-
-        if (mode === 'enhanced-diff') {
-          enhanceBox.classList.add('active');
-        } else {
-          enhanceBox.classList.remove('active');
+        if (enhanceBox) {
+          if (mode === 'enhanced-diff') enhanceBox.classList.add('active');
+          else enhanceBox.classList.remove('active');
         }
       }
 
@@ -453,39 +378,27 @@
         const slider = viewer.querySelector('.enhance-slider');
         const gainText = viewer.querySelector('.gain-value');
         const modeButtons = viewer.querySelectorAll('[data-switch-mode]');
+        if (!coverImg || !attackedImg || !rawDiffCanvas || !enhancedDiffCanvas || !slider || !gainText) return;
 
         try {
           await Promise.all([waitForImage(coverImg), waitForImage(attackedImg)]);
-
-          function drawRaw() {
-            renderRawDiff(coverImg, attackedImg, rawDiffCanvas);
-          }
-
+          function drawRaw() { renderRawDiff(coverImg, attackedImg, rawDiffCanvas); }
           function drawEnhanced() {
             const gain = Number(slider.value || 12);
             gainText.textContent = gain + 'x';
             renderEnhancedDiff(coverImg, attackedImg, enhancedDiffCanvas, gain);
           }
-
           drawRaw();
           drawEnhanced();
-
           slider.addEventListener('input', drawEnhanced);
-
           modeButtons.forEach(function (btn) {
             btn.addEventListener('click', function () {
               const mode = btn.dataset.switchMode;
-
-              if (mode === 'raw-diff') {
-                drawRaw();
-              } else if (mode === 'enhanced-diff') {
-                drawEnhanced();
-              }
-
+              if (mode === 'raw-diff') drawRaw();
+              else if (mode === 'enhanced-diff') drawEnhanced();
               setViewerMode(viewer, mode);
             });
           });
-
           setViewerMode(viewer, 'cover');
         } catch (e) {
           console.error('viewer init failed:', e);

@@ -15,12 +15,27 @@ class EmbedResult:
     extracted_preview: np.ndarray | None = None
 
 
+@dataclass(frozen=True)
+class TileJob:
+    tile_index: int
+    y0: int
+    y1: int
+    x0: int
+    x1: int
+    bit_offset: int
+    n_bits: int
+    tile_content_id: str
+
+
 class BlindDwtDctQim:
     """Blind watermarking with DWT + block-DCT + scalar QIM.
 
     - Blind extraction: original image is not required.
     - Keyed placement: selected blocks and coefficient signs depend on master_key + content_id.
     - Repetition code: each logical bit is embedded in multiple blocks and decoded by majority vote.
+
+    新增：支持分块规划。这样大图可以按 tile 逐块处理，而不是一次性把整张图读进内存。
+    分块模式下，每个 tile 独立做 DWT-DCT-QIM；提取时只要 tile 划分和 content_id 一致，就能盲提取。
     """
 
     def __init__(
@@ -42,6 +57,7 @@ class BlindDwtDctQim:
         self.repeats = int(repeats)
         self.bands = bands
         self.delta_mode = delta_mode
+        self._tile_capacity_cache: dict[tuple[int, int], int] = {}
 
     def _seed(self, *parts: object) -> int:
         msg = "||".join(map(str, (self.master_key, *parts))).encode("utf-8")
@@ -60,7 +76,7 @@ class BlindDwtDctQim:
         d0 = abs(x - q0)
         d1 = abs(x - q1)
         return int(d1 < d0), float(d0 - d1)
-    
+
     def _working_delta(self, src_dtype: np.dtype) -> float:
         peak = self._pixel_peak(src_dtype)
 
@@ -91,7 +107,6 @@ class BlindDwtDctQim:
         src_dtype = image_bgr.dtype
         peak = cls._pixel_peak(src_dtype)
 
-        # 统一归一化到 [0, 1]
         image_f32 = image_bgr.astype(np.float32) / peak
         return image_f32, src_dtype, peak
 
@@ -111,7 +126,6 @@ class BlindDwtDctQim:
     def _split_bands(self, image_bgr: np.ndarray):
         image_f32, src_dtype, peak = self._to_working_float(image_bgr)
 
-        # 对 float32 图像做颜色空间转换，范围统一使用 [0, 1]
         ycrcb = cv2.cvtColor(image_f32, cv2.COLOR_BGR2YCrCb)
         y = ycrcb[:, :, 0]
 
@@ -124,7 +138,6 @@ class BlindDwtDctQim:
         h, w = ycrcb.shape[:2]
         y_rec = y_rec[:h, :w]
 
-        # 关键：先裁掉越界值，避免带着异常亮度进颜色空间转换
         y_rec = np.clip(y_rec, 0.0, 1.0)
 
         out = ycrcb.copy()
@@ -230,6 +243,112 @@ class BlindDwtDctQim:
         if np.any(ties):
             majority[ties] = (conf[ties].sum(axis=1) > 0).astype(np.uint8)
         return majority
+
+    def tile_capacity(self, tile_h: int, tile_w: int) -> int:
+        key = (int(tile_h), int(tile_w))
+        if key in self._tile_capacity_cache:
+            return self._tile_capacity_cache[key]
+
+        if tile_h < 2 * self.block_size or tile_w < 2 * self.block_size:
+            self._tile_capacity_cache[key] = 0
+            return 0
+
+        dummy = np.zeros((tile_h, tile_w, 3), dtype=np.uint8)
+        _, ll, lh, hl, hh, _, _ = self._split_bands(dummy)
+        band_map = {"LL": ll, "LH": lh, "HL": hl, "HH": hh}
+        capacity = len(self._candidate_positions(band_map)) // max(self.repeats, 1)
+        self._tile_capacity_cache[key] = int(capacity)
+        return int(capacity)
+
+    def build_tiled_jobs(
+        self,
+        image_shape: tuple[int, int, int] | tuple[int, int],
+        n_bits: int,
+        content_id: str,
+        tile_size: int = 2048,
+    ) -> list[TileJob]:
+        if tile_size < 2 * self.block_size:
+            raise ValueError(f"tile_size 太小，至少需要 >= {2 * self.block_size}")
+
+        h = int(image_shape[0])
+        w = int(image_shape[1])
+        bit_offset = 0
+        jobs: list[TileJob] = []
+        tile_index = 0
+
+        for y0 in range(0, h, tile_size):
+            y1 = min(y0 + tile_size, h)
+            for x0 in range(0, w, tile_size):
+                x1 = min(x0 + tile_size, w)
+                capacity = self.tile_capacity(y1 - y0, x1 - x0)
+                if capacity <= 0:
+                    tile_index += 1
+                    continue
+
+                take = min(capacity, n_bits - bit_offset)
+                if take > 0:
+                    jobs.append(
+                        TileJob(
+                            tile_index=tile_index,
+                            y0=y0,
+                            y1=y1,
+                            x0=x0,
+                            x1=x1,
+                            bit_offset=bit_offset,
+                            n_bits=take,
+                            tile_content_id=f"{content_id}::tile::{tile_index}::{y0}_{x0}",
+                        )
+                    )
+                    bit_offset += take
+                    if bit_offset >= n_bits:
+                        return jobs
+                tile_index += 1
+
+        if bit_offset < n_bits:
+            raise ValueError(
+                f"大图分块容量不足：需要 {n_bits} bits，当前 tile_size={tile_size} 仅能放下 {bit_offset} bits"
+            )
+        return jobs
+
+    def embed_tiled_rgb_inplace(
+        self,
+        image_rgb: np.ndarray,
+        bits: np.ndarray,
+        content_id: str,
+        tile_size: int = 2048,
+    ) -> list[TileJob]:
+        bits = np.asarray(bits, dtype=np.uint8).flatten()
+        jobs = self.build_tiled_jobs(image_rgb.shape, len(bits), content_id, tile_size=tile_size)
+
+        for job in jobs:
+            tile_rgb = np.asarray(image_rgb[job.y0:job.y1, job.x0:job.x1, :])
+            tile_bgr = cv2.cvtColor(np.array(tile_rgb, copy=True), cv2.COLOR_RGB2BGR)
+            embedded = self.embed(
+                tile_bgr,
+                bits[job.bit_offset:job.bit_offset + job.n_bits],
+                content_id=job.tile_content_id,
+            ).image
+            image_rgb[job.y0:job.y1, job.x0:job.x1, :] = cv2.cvtColor(embedded, cv2.COLOR_BGR2RGB)
+
+        return jobs
+
+    def extract_tiled_rgb(
+        self,
+        image_rgb: np.ndarray,
+        n_bits: int,
+        content_id: str,
+        tile_size: int = 2048,
+    ) -> np.ndarray:
+        jobs = self.build_tiled_jobs(image_rgb.shape, n_bits, content_id, tile_size=tile_size)
+        out = np.zeros(n_bits, dtype=np.uint8)
+
+        for job in jobs:
+            tile_rgb = np.asarray(image_rgb[job.y0:job.y1, job.x0:job.x1, :])
+            tile_bgr = cv2.cvtColor(np.array(tile_rgb, copy=False), cv2.COLOR_RGB2BGR)
+            bits_part = self.extract(tile_bgr, n_bits=job.n_bits, content_id=job.tile_content_id)
+            out[job.bit_offset:job.bit_offset + job.n_bits] = bits_part
+
+        return out
 
     @staticmethod
     def bit_error_rate(reference_bits: np.ndarray, estimated_bits: np.ndarray) -> float:

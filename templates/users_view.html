@@ -7,10 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
     <style>
-      body {
-        background: #f8f9fa;
-      }
-
+      body { background: #f8f9fa; }
       .result-card {
         border: 0;
         border-radius: 16px;
@@ -18,13 +15,11 @@
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
         background: #fff;
       }
-
       .result-card .card-header {
         background: #fff;
         border-bottom: 1px solid #eef1f4;
         font-weight: 700;
       }
-
       .viewer-stage {
         position: relative;
         width: 100%;
@@ -37,7 +32,6 @@
         align-items: center;
         justify-content: center;
       }
-
       .stage-layer {
         width: 100%;
         height: auto;
@@ -45,16 +39,8 @@
         object-fit: contain;
         background: #fff;
       }
-
-      .stage-layer.active {
-        display: block;
-      }
-
-      canvas.stage-layer {
-        width: 100%;
-        height: auto;
-      }
-
+      .stage-layer.active { display: block; }
+      canvas.stage-layer { width: 100%; height: auto; }
       .placeholder-box {
         width: 100%;
         min-height: 280px;
@@ -67,35 +53,23 @@
         text-align: center;
         padding: 24px;
       }
-
-      .mode-btns .btn {
-        min-width: 96px;
-      }
-
-      .mini-tip {
-        font-size: 13px;
-        color: #6c757d;
-      }
-
+      .mode-btns .btn { min-width: 96px; }
       .range-label {
         font-size: 13px;
         color: #6c757d;
         min-width: 84px;
       }
-
       .gain-value {
         font-weight: 700;
         color: #212529;
         min-width: 40px;
         text-align: right;
       }
-
-      .enhance-box {
-        display: none;
-      }
-
-      .enhance-box.active {
-        display: block;
+      .enhance-box { display: none; }
+      .enhance-box.active { display: block; }
+      .mini-muted {
+        font-size: 13px;
+        color: #6c757d;
       }
     </style>
   </head>
@@ -105,119 +79,172 @@
 
       <h5 class="mb-3">输出目录: {{ out_dir }}</h5>
 
-      <div class="row">
-        {% for u in users %}
-          <div class="col-lg-6 mb-4">
-            <div class="card result-card h-100">
-              <div class="card-header d-flex justify-content-between align-items-center">
-                <span>{{ u.user_id }}</span>
-                <span class="badge text-bg-light border">用户结果</span>
+      {% if single_file_view %}
+        <div class="alert alert-warning">
+          当前 report 属于<strong>单文件链路</strong>（{{ single_file_view.route }}）。这个页面会展示单文件结果摘要，不再按多个用户分卡片展示。
+        </div>
+
+        <div class="card result-card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>单文件结果</span>
+            <span class="badge text-bg-light border">{{ single_file_view.mode }}</span>
+          </div>
+          <div class="card-body">
+            {% if single_file_view.preview_png %}
+              <div class="viewer-stage mb-3">
+                <img
+                  src="{{ url_for('results_file', filename=single_file_view.preview_png, out_dir=out_dir) }}"
+                  alt="预览图"
+                  class="stage-layer active"
+                >
               </div>
-
-              <div class="card-body">
-                {% set cover = 'cover.png' %}
-                {% set w = u.user_id + '_watermarked.png' %}
-                {% set viewer_id = 'viewer_' + loop.index|string %}
-
-                {% if cover in images and w in images %}
-                  <div id="{{ viewer_id }}" class="wm-viewer">
-                    <div class="viewer-stage mb-3">
-                      <img
-                        src="{{ url_for('results_file', filename=cover, out_dir=out_dir) }}"
-                        alt="原图"
-                        class="stage-layer cover-layer active"
-                        data-mode="cover"
-                      >
-                      <img
-                        src="{{ url_for('results_file', filename=w, out_dir=out_dir) }}"
-                        alt="{{ u.user_id }} 带水印图"
-                        class="stage-layer watermarked-layer"
-                        data-mode="watermarked"
-                      >
-                      <canvas
-                        class="stage-layer raw-diff-layer"
-                        data-mode="raw-diff"
-                      ></canvas>
-                      <canvas
-                        class="stage-layer enhanced-diff-layer"
-                        data-mode="enhanced-diff"
-                      ></canvas>
-                    </div>
-
-                    <div class="d-flex flex-wrap gap-2 mode-btns mb-3">
-                      <button type="button" class="btn btn-primary btn-sm active" data-switch-mode="cover">
-                        原图
-                      </button>
-                      <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="watermarked">
-                        带水印图
-                      </button>
-                      <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="raw-diff">
-                        预览差异图
-                      </button>
-                      <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="enhanced-diff">
-                        增强预览差异图
-                      </button>
-                    </div>
-
-                    {% set w_tif = u.user_id + '_watermarked.tif' %}
-                    {% set w_psb = u.user_id + '_watermarked.psb' %}
-                    <div class="d-flex gap-2 flex-wrap">
-                      <a class="btn btn-sm btn-outline-secondary"
-                        href="{{ url_for('results_file', filename=w, out_dir=out_dir) }}"
-                        download>
-                        下载 PNG
-                      </a>
-                      {% if w_tif in images %}
-                        <a class="btn btn-sm btn-outline-success"
-                          href="{{ url_for('results_file', filename=w_tif, out_dir=out_dir) }}"
-                          download>
-                          下载 TIFF
-                        </a>
-                      {% endif %}
-                      {% if w_psb in images %}
-                        <a class="btn btn-sm btn-outline-primary"
-                          href="{{ url_for('results_file', filename=w_psb, out_dir=out_dir) }}"
-                          download>
-                          下载 PSB
-                        </a>
-                      {% endif %}
-                    </div>
-
-                    {% set ur = report.user_results.get(u.user_id, {}) if report and report.user_results else {} %}
-                    {% if ur %}
-                      <div class="alert alert-light border mt-3 mb-0">
-                        <div><strong>嵌入字符串：</strong>{{ ur.embedded_text }}</div>
-                        <div><strong>提取字符串：</strong>{{ ur.extracted_text if ur.extracted_text else '解析失败' }}</div>
-                        <div><strong>字符串校验：</strong>{{ '通过' if ur.text_ok else '失败' }}</div>
-                        <div><strong>指纹 BER：</strong>{{ '%.4f'|format(ur.fingerprint_ber) }}</div>
-                      </div>
-                    {% endif %}
-
-                    <div class="enhance-box mb-3">
-                      <div class="d-flex align-items-center gap-2">
-                        <span class="range-label">增强倍数</span>
-                        <input
-                          type="range"
-                          class="form-range enhance-slider"
-                          min="1"
-                          max="40"
-                          step="1"
-                          value="12"
-                        >
-                        <span class="gain-value">12x</span>
-                      </div>
-                    </div>
-                  </div>
-                {% else %}
-                  <div class="placeholder-box">
-                    缺少 cover.png 或 {{ w }}，无法显示该用户的差异图
-                  </div>
-                {% endif %}
+            {% else %}
+              <div class="placeholder-box mb-3">
+                当前单文件链路没有可直接预览的 PNG。<br>
+                这种情况常见于大图输出，仅生成PSB/TIFF文件。
               </div>
+            {% endif %}
+
+            <div class="d-flex gap-2 flex-wrap mb-3">
+              {% if single_file_view.preview_png %}
+                <a class="btn btn-sm btn-outline-secondary"
+                  href="{{ url_for('results_file', filename=single_file_view.preview_png, out_dir=out_dir) }}"
+                  download>
+                  下载 PNG
+                </a>
+              {% endif %}
+              {% if single_file_view.output_tif %}
+                <a class="btn btn-sm btn-outline-success"
+                  href="{{ url_for('results_file', filename=single_file_view.output_tif, out_dir=out_dir) }}"
+                  download>
+                  下载 TIFF
+                </a>
+              {% endif %}
+              {% if single_file_view.output_psb %}
+                <a class="btn btn-sm btn-outline-primary"
+                  href="{{ url_for('results_file', filename=single_file_view.output_psb, out_dir=out_dir) }}"
+                  download>
+                  下载 PSB
+                </a>
+              {% endif %}
+              {% if single_file_view.report_json %}
+                <a class="btn btn-sm btn-outline-info"
+                  href="{{ url_for('results_file', filename=single_file_view.report_json, out_dir=out_dir) }}"
+                  download>
+                  下载链路 report
+                </a>
+              {% endif %}
+            </div>
+
+            <div class="alert alert-light border mb-0">
+              <div><strong>用户：</strong>{{ single_file_view.user_id if single_file_view.user_id else '未记录' }}</div>
+              <div><strong>嵌入字符串：</strong>{{ single_file_view.embedded_text if single_file_view.embedded_text else '未记录' }}</div>
+              <div><strong>提取字符串：</strong>{{ single_file_view.extracted_text if single_file_view.extracted_text else '解析失败' }}</div>
+              <div><strong>字符串校验：</strong>{{ '通过' if single_file_view.text_ok else '失败' }}</div>
+              <div><strong>tile_size：</strong>{{ single_file_view.tile_size if single_file_view.tile_size else '-' }}</div>
+              <div><strong>tile_count：</strong>{{ single_file_view.tile_count if single_file_view.tile_count else '-' }}</div>
+              <div><strong>输入位深：</strong>{{ single_file_view.input_depth if single_file_view.input_depth else '-' }}</div>
+              <div><strong>尺寸：</strong>{{ single_file_view.width if single_file_view.width else '-' }} × {{ single_file_view.height if single_file_view.height else '-' }}</div>
+              <div><strong>请求用户数：</strong>{{ single_file_view.requested_num_users if single_file_view.requested_num_users else 1 }}</div>
+              {% if single_file_view.fingerprint_ber is not none %}
+                <div><strong>指纹 BER：</strong>{{ '%.4f'|format(single_file_view.fingerprint_ber) }}</div>
+              {% endif %}
             </div>
           </div>
-        {% endfor %}
-      </div>
+        </div>
+      {% else %}
+        <div class="row">
+          {% for u in users %}
+            <div class="col-lg-6 mb-4">
+              <div class="card result-card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <span>{{ u.user_id }}</span>
+                  <span class="badge text-bg-light border">用户结果</span>
+                </div>
+
+                <div class="card-body">
+                  {% set cover = 'cover.png' %}
+                  {% set w = u.user_id + '_watermarked.png' %}
+
+                  {% if cover in images and w in images %}
+                    <div class="wm-viewer">
+                      <div class="viewer-stage mb-3">
+                        <img
+                          src="{{ url_for('results_file', filename=cover, out_dir=out_dir) }}"
+                          alt="原图"
+                          class="stage-layer cover-layer active"
+                          data-mode="cover"
+                        >
+                        <img
+                          src="{{ url_for('results_file', filename=w, out_dir=out_dir) }}"
+                          alt="{{ u.user_id }} 带水印图"
+                          class="stage-layer watermarked-layer"
+                          data-mode="watermarked"
+                        >
+                        <canvas class="stage-layer raw-diff-layer" data-mode="raw-diff"></canvas>
+                        <canvas class="stage-layer enhanced-diff-layer" data-mode="enhanced-diff"></canvas>
+                      </div>
+
+                      <div class="d-flex flex-wrap gap-2 mode-btns mb-3">
+                        <button type="button" class="btn btn-primary btn-sm active" data-switch-mode="cover">原图</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="watermarked">带水印图</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="raw-diff">预览差异图</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-switch-mode="enhanced-diff">增强预览差异图</button>
+                      </div>
+
+                      {% set w_tif = u.user_id + '_watermarked.tif' %}
+                      {% set w_psb = u.user_id + '_watermarked.psb' %}
+                      <div class="d-flex gap-2 flex-wrap">
+                        <a class="btn btn-sm btn-outline-secondary"
+                          href="{{ url_for('results_file', filename=w, out_dir=out_dir) }}"
+                          download>
+                          下载 PNG
+                        </a>
+                        {% if w_tif in images %}
+                          <a class="btn btn-sm btn-outline-success"
+                            href="{{ url_for('results_file', filename=w_tif, out_dir=out_dir) }}"
+                            download>
+                            下载 TIFF
+                          </a>
+                        {% endif %}
+                        {% if w_psb in images %}
+                          <a class="btn btn-sm btn-outline-primary"
+                            href="{{ url_for('results_file', filename=w_psb, out_dir=out_dir) }}"
+                            download>
+                            下载 PSB
+                          </a>
+                        {% endif %}
+                      </div>
+
+                      {% set ur = report.user_results.get(u.user_id, {}) if report and report.user_results else {} %}
+                      {% if ur %}
+                        <div class="alert alert-light border mt-3 mb-0">
+                          <div><strong>嵌入字符串：</strong>{{ ur.embedded_text }}</div>
+                          <div><strong>提取字符串：</strong>{{ ur.extracted_text if ur.extracted_text else '解析失败' }}</div>
+                          <div><strong>字符串校验：</strong>{{ '通过' if ur.text_ok else '失败' }}</div>
+                          <div><strong>指纹 BER：</strong>{{ '%.4f'|format(ur.fingerprint_ber) }}</div>
+                        </div>
+                      {% endif %}
+
+                      <div class="enhance-box mb-3">
+                        <div class="d-flex align-items-center gap-2">
+                          <span class="range-label">增强倍数</span>
+                          <input type="range" class="form-range enhance-slider" min="1" max="40" step="1" value="12">
+                          <span class="gain-value">12x</span>
+                        </div>
+                      </div>
+                    </div>
+                  {% else %}
+                    <div class="placeholder-box">
+                      缺少 cover.png 或 {{ w }}，无法显示该用户的差异图
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -248,23 +275,19 @@
         const w = coverImg.naturalWidth;
         const h = coverImg.naturalHeight;
         if (!w || !h) return;
-
         canvas.width = w;
         canvas.height = h;
-
         const coverData = getImageData(coverImg).data;
         const watermarkedData = getImageData(watermarkedImg).data;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         const out = ctx.createImageData(w, h);
         const outData = out.data;
-
         for (let i = 0; i < coverData.length; i += 4) {
           outData[i] = Math.abs(watermarkedData[i] - coverData[i]);
           outData[i + 1] = Math.abs(watermarkedData[i + 1] - coverData[i + 1]);
           outData[i + 2] = Math.abs(watermarkedData[i + 2] - coverData[i + 2]);
           outData[i + 3] = 255;
         }
-
         ctx.putImageData(out, 0, 0);
       }
 
@@ -272,29 +295,23 @@
         const w = coverImg.naturalWidth;
         const h = coverImg.naturalHeight;
         if (!w || !h) return;
-
         canvas.width = w;
         canvas.height = h;
-
         const coverData = getImageData(coverImg).data;
         const watermarkedData = getImageData(watermarkedImg).data;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         const out = ctx.createImageData(w, h);
         const outData = out.data;
-
         for (let i = 0; i < coverData.length; i += 4) {
           const dr = Math.abs(watermarkedData[i] - coverData[i]);
           const dg = Math.abs(watermarkedData[i + 1] - coverData[i + 1]);
           const db = Math.abs(watermarkedData[i + 2] - coverData[i + 2]);
-
           const gray = Math.min(255, ((dr + dg + db) / 3) * gain);
-
           outData[i] = gray;
           outData[i + 1] = gray;
           outData[i + 2] = gray;
           outData[i + 3] = 255;
         }
-
         ctx.putImageData(out, 0, 0);
       }
 
@@ -323,10 +340,12 @@
           }
         });
 
-        if (mode === 'enhanced-diff') {
-          enhanceBox.classList.add('active');
-        } else {
-          enhanceBox.classList.remove('active');
+        if (enhanceBox) {
+          if (mode === 'enhanced-diff') {
+            enhanceBox.classList.add('active');
+          } else {
+            enhanceBox.classList.remove('active');
+          }
         }
       }
 
@@ -338,6 +357,7 @@
         const slider = viewer.querySelector('.enhance-slider');
         const gainText = viewer.querySelector('.gain-value');
         const modeButtons = viewer.querySelectorAll('[data-switch-mode]');
+        if (!coverImg || !watermarkedImg || !rawDiffCanvas || !enhancedDiffCanvas || !slider || !gainText) return;
 
         try {
           await Promise.all([waitForImage(coverImg), waitForImage(watermarkedImg)]);
@@ -354,23 +374,18 @@
 
           drawRaw();
           drawEnhanced();
-
           slider.addEventListener('input', drawEnhanced);
-
           modeButtons.forEach(function (btn) {
             btn.addEventListener('click', function () {
               const mode = btn.dataset.switchMode;
-
               if (mode === 'raw-diff') {
                 drawRaw();
               } else if (mode === 'enhanced-diff') {
                 drawEnhanced();
               }
-
               setViewerMode(viewer, mode);
             });
           });
-
           setViewerMode(viewer, 'cover');
         } catch (e) {
           console.error('viewer init failed:', e);
